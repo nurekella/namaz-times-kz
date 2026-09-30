@@ -9,7 +9,7 @@
     <AssemblyName>NamazTimes</AssemblyName>
     <Product>Namaz Times KZ</Product>
     <AssemblyTitle>Namaz Times KZ</AssemblyTitle>
-    <Version>0.4.8</Version>
+    <Version>0.4.9</Version>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <!-- No designer in this project; controls are built in code. -->
