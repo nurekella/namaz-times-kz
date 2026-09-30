@@ -39,6 +39,8 @@ public class SettingsForm : Form
         Row(g1, L.T("AsrMethod"), madhab);
         var timeFormat = new Segmented([L.T("H24"), L.T("H12")], s.Hour12 ? 1 : 0);
         Row(g1, L.T("TimeFormat"), timeFormat);
+        var fasting = new Segmented([L.T("FastAuto"), L.T("FastAlways"), L.T("FastOff")], (int)s.Fasting);
+        Row(g1, L.T("FastTimes"), fasting);
         var hijri = new Stepper(s.HijriAdjust, -2, 2, 1, v => v > 0 ? $"+{v}" : v.ToString());
         Row(g1, L.T("HijriAdjust"), hijri);
 
@@ -119,6 +121,7 @@ public class SettingsForm : Form
             s.City = city;
             s.Hanafi = madhab.Selected == 0;
             s.Hour12 = timeFormat.Selected == 1;
+            s.Fasting = (FastingMode)fasting.Selected;
             s.HijriAdjust = hijri.Value;
             s.Muted = !notifyOn.Checked;
             s.RemindBefore = remind.Value;

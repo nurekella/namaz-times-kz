@@ -119,7 +119,13 @@ public class Widget : Form
     /// Test seam: lets offscreen renders show a Ramadan day.
     internal static Func<DateTime> Clock = () => DateTime.Now;
 
-    bool IsRamadan(DateTime now) => Hijri.Of(DateOnly.FromDateTime(now), s.HijriAdjust).M == 9;
+    // Days that show suhoor/iftar: Ramadan by default; "Always" also covers voluntary fasts.
+    bool IsRamadan(DateTime now) => s.Fasting switch
+    {
+        FastingMode.Always => true,
+        FastingMode.Off => false,
+        _ => Hijri.Of(DateOnly.FromDateTime(now), s.HijriAdjust).M == 9,
+    };
 
     static DateTime? Find(List<(P P, DateTime At)>? l, P p) => l?.Where(x => x.P == p).Select(x => (DateTime?)x.At).FirstOrDefault();
 

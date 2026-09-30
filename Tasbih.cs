@@ -115,7 +115,8 @@ public class TasbihForm : Form
     // Space counts from anywhere in the window (before buttons can treat it as a click).
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
-        if (keyData == Keys.Space) { Count(); return true; }
+        // Bit 30 of lParam = key was already down: ignore auto-repeat so holding Space counts once.
+        if (keyData == Keys.Space) { if ((msg.LParam.ToInt64() & (1L << 30)) == 0) Count(); return true; }
         return base.ProcessCmdKey(ref msg, keyData);
     }
 
@@ -132,7 +133,6 @@ public class TasbihForm : Form
         }
 
         protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); if (e.Button == MouseButtons.Left) f.Count(); }
-        protected override void OnMouseDoubleClick(MouseEventArgs e) => f.Count(); // fast clicking arrives as double-clicks
 
         protected override void OnPaint(PaintEventArgs e)
         {

@@ -6,6 +6,8 @@ namespace NamazTimes;
 
 public enum P { Tahajjud, Fajr, Sunrise, Duha, Dhuhr, Asr, Maghrib, Isha }
 
+public enum FastingMode { Ramadan, Always, Off }
+
 public record City(string Title, string Lat, string Lng);
 
 public class Settings
@@ -14,6 +16,7 @@ public class Settings
     public string Lang { get; set; } = L.Default();
     public bool Hanafi { get; set; } = true;
     public bool Hour12 { get; set; }
+    public FastingMode Fasting { get; set; }
     public bool ShowNameOfDay { get; set; } = true;
     public int TasbihTarget { get; set; } = 33;
     public string TasbihDate { get; set; } = "";
