@@ -5,10 +5,11 @@ using System.Text.Json;
 namespace NamazTimes;
 
 /// One of the 99 names of Allah. Texts live in names99.json so they can be reviewed without touching code.
-public record Name99(int N, string Ar, string Kk, string Ru, string En, string Mkk, string Mru, string Men)
+public record Name99(int N, string Ar, string Kk, string Ru, string En, string Mkk, string Mru, string Men, string Dkk, string Dru, string Den)
 {
     public string Translit => L.Lang switch { "kk" => Kk, "en" => En, _ => Ru };
     public string Meaning => L.Lang switch { "kk" => Mkk, "en" => Men, _ => Mru };
+    public string Description => L.Lang switch { "kk" => Dkk, "en" => Den, _ => Dru };
 
     public static readonly Lazy<List<Name99>> All = new(() =>
     {
@@ -17,7 +18,8 @@ public record Name99(int N, string Ar, string Kk, string Ru, string En, string M
         return JsonSerializer.Deserialize<List<JsonElement>>(stream, opts)!.Select((e, i) => new Name99(i + 1,
             e.GetProperty("ar").GetString()!, e.GetProperty("kk").GetString()!, e.GetProperty("ru").GetString()!,
             e.GetProperty("en").GetString()!, e.GetProperty("mkk").GetString()!, e.GetProperty("mru").GetString()!,
-            e.GetProperty("men").GetString()!)).ToList();
+            e.GetProperty("men").GetString()!, e.GetProperty("dkk").GetString()!, e.GetProperty("dru").GetString()!,
+            e.GetProperty("den").GetString()!)).ToList();
     });
 
     /// A different name every day, cycling through all 99.
@@ -48,7 +50,7 @@ public class NamesForm : Form
             Dock = DockStyle.Top, PlaceholderText = L.T("Search"), BackColor = Theme.Card, ForeColor = Theme.Text,
             BorderStyle = BorderStyle.FixedSingle, Font = Theme.UI(11f),
         };
-        var detail = new DetailPanel(this) { Dock = DockStyle.Bottom, Height = Theme.Dp(130) };
+        var detail = new DetailPanel(this) { Dock = DockStyle.Bottom, Height = Theme.Dp(170) };
         var grid = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(0, Theme.Dp(8), 0, Theme.Dp(8)) };
         grid.HandleCreated += (_, _) => Theme.DarkScrollbars(grid);
         foreach (var n in Name99.All.Value)
@@ -138,7 +140,9 @@ public class NamesForm : Form
             int x = Theme.Dp(18), w = Width - arW - Theme.Dp(36);
             TextRenderer.DrawText(g, $"{n.N} / 99", small, new Point(x, (int)r.Y + Theme.Dp(12)), Gold);
             TextRenderer.DrawText(g, n.Translit, tr, new Rectangle(x, (int)r.Y + Theme.Dp(30), w, Theme.Dp(30)), Theme.Text, TextFormatFlags.EndEllipsis);
-            TextRenderer.DrawText(g, n.Meaning, mean, new Rectangle(x, (int)r.Y + Theme.Dp(62), w, Theme.Dp(50)), Theme.Muted, TextFormatFlags.WordBreak);
+            TextRenderer.DrawText(g, n.Meaning, mean, new Rectangle(x, (int)r.Y + Theme.Dp(60), w, Theme.Dp(24)), Gold, TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, n.Description, mean, new Rectangle(x, (int)r.Y + Theme.Dp(86), w, (int)r.Height - Theme.Dp(92)), Theme.Text,
+                TextFormatFlags.WordBreak | TextFormatFlags.EndEllipsis);
         }
     }
 
