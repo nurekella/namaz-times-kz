@@ -10,7 +10,7 @@ public class Widget : Form
     readonly Settings s;
     readonly NotifyIcon tray;
     readonly System.Windows.Forms.Timer timer = new() { Interval = 1000 };
-    readonly ToolStripMenuItem showItem, monthItem, holidaysItem, tasbihItem, namesItem, muteItem, settingsItem, checkUpdateItem, updateItem, exitItem;
+    readonly ToolStripMenuItem showItem, monthItem, holidaysItem, tasbihItem, namesItem, typesItem, muteItem, settingsItem, checkUpdateItem, updateItem, exitItem;
     readonly List<(RectangleF R, P P)> bells = [];
     DateTime lastTick = Clock(), lastUpdateCheck;
     DateOnly shownDate;
@@ -28,13 +28,14 @@ public class Widget : Form
     HolidaysForm? holidaysForm;
     TasbihForm? tasbihForm;
     NamesForm? namesForm;
+    PrayerTypesForm? typesForm;
     RectangleF nameCard; // "name of the day" card, clickable
     bool full, hover;          // fullscreen mode; mouse over widget (shows window buttons)
     int hot = -1, fullZoom = 100;
     Rectangle normalBounds;
     readonly RectangleF[] captions = new RectangleF[3]; // minimize, fullscreen, close
-    readonly RectangleF[] tools = new RectangleF[4];    // settings, tasbih, 99 names, menu — always visible, top-left
-    static readonly string[] ToolTips = ["Settings", "Tasbih", "Names99", "Menu"];
+    readonly RectangleF[] tools = new RectangleF[5];    // settings, tasbih, 99 names, prayer types, menu — always visible, top-left
+    static readonly string[] ToolTips = ["Settings", "Tasbih", "Names99", "PrayerTypes", "Menu"];
     int hotTool = -1;
     readonly ToolTip tip = new();
 
@@ -58,6 +59,7 @@ public class Widget : Form
         monthItem = Theme.MenuItem('', (_, _) => Open(ref monthForm, () => new MonthForm(s)));
         holidaysItem = Theme.MenuItem('', (_, _) => Open(ref holidaysForm, () => new HolidaysForm(s)));
         tasbihItem = Theme.MenuItem('', (_, _) => OpenTasbih()); // RadioBullet, a bead
+        typesItem = Theme.MenuItem('', (_, _) => OpenTypes()); // ReadingMode (open book)
         namesItem = Theme.MenuItem('', (_, _) => OpenNames());   // Dictionary (book)
         muteItem = Theme.MenuItem('', (_, _) => { s.Muted = !s.Muted; Data.Save(s); Invalidate(); });
         settingsItem = Theme.MenuItem('', (_, _) => OpenSettings());
@@ -65,7 +67,7 @@ public class Widget : Form
         updateItem = Theme.MenuItem('', (_, _) => _ = InstallUpdate());
         updateItem.Visible = false;
         exitItem = Theme.MenuItem('', (_, _) => { tray!.Visible = false; Application.Exit(); });
-        menu.Items.AddRange([showItem, monthItem, holidaysItem, tasbihItem, namesItem, new ToolStripSeparator(), muteItem, settingsItem, checkUpdateItem, updateItem,
+        menu.Items.AddRange([showItem, monthItem, holidaysItem, tasbihItem, namesItem, typesItem, new ToolStripSeparator(), muteItem, settingsItem, checkUpdateItem, updateItem,
             new ToolStripSeparator(), exitItem]);
         menu.Opening += (_, _) => { showItem.Checked = Visible; muteItem.Checked = s.Muted; };
         ContextMenuStrip = menu;
@@ -101,6 +103,7 @@ public class Widget : Form
         holidaysItem.Text = L.T("Holidays");
         tasbihItem.Text = L.T("Tasbih");
         namesItem.Text = L.T("Names99");
+        typesItem.Text = L.T("PrayerTypes");
         muteItem.Text = L.T("Mute");
         settingsItem.Text = L.T("Settings");
         checkUpdateItem.Text = L.T("CheckUpdates");
@@ -520,7 +523,7 @@ public class Widget : Form
         // Settings, tasbih, 99 names and menu buttons: always visible in the top strip, so nobody has to guess the right-click.
         using (var toolFont = new Font("Segoe MDL2 Assets", 9.5f * EZ / 100f))
         {
-            string[] toolGlyphs = ["", "", "", ""]; // Settings, RadioBullet (tasbih), Dictionary (99 names), More
+            string[] toolGlyphs = ["", "", "", "", ""]; // Settings, RadioBullet (tasbih), Dictionary (99 names), ReadingMode (prayer types), More
             for (int i = 0; i < tools.Length; i++)
             {
                 tools[i] = new RectangleF(ox + Z(8) + i * Z(28), oy + Z(2), Z(26), Z(24));
@@ -561,7 +564,8 @@ public class Widget : Form
             case 0: OpenSettings(); return;
             case 1: OpenTasbih(); return;
             case 2: OpenNames(); return;
-            case 3: ContextMenuStrip!.Show(this, Point.Round(new PointF(tools[3].Left, tools[3].Bottom))); return;
+            case 3: OpenTypes(); return;
+            case 4: ContextMenuStrip!.Show(this, Point.Round(new PointF(tools[4].Left, tools[4].Bottom))); return;
         }
         switch (hover ? Array.FindIndex(captions, r => r.Contains(e.Location)) : -1)
         {
@@ -685,6 +689,7 @@ public class Widget : Form
 
     void OpenTasbih() => Open(ref tasbihForm, () => new TasbihForm(s));
     void OpenNames() => Open(ref namesForm, () => new NamesForm());
+    void OpenTypes() => Open(ref typesForm, () => new PrayerTypesForm());
 
     void OpenSettings()
     {
