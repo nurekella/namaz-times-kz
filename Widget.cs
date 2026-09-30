@@ -437,7 +437,10 @@ public class Widget : Form
             // Speaker: click toggles this prayer's notification.
             var on = s.Alerts.Contains(r.P);
             var icon = new RectangleF(box.X - Z(30), ry, Z(24), h);
-            TextRenderer.DrawText(g, on ? "" : "", icons, Rectangle.Round(icon), // Volume3 / Volume0
+            // Centre the ink, not the glyph box: measured ink centre is 0.05 em (Volume3) and 0.36 em (Volume0) left of the box centre.
+            var em = icons.SizeInPoints * DeviceDpi / 72f;
+            var inked = icon; inked.Offset((on ? 0.05f : 0.362f) * em, 0);
+            TextRenderer.DrawText(g, on ? "" : "", icons, Rectangle.Round(inked), // Volume3 / Volume0
                 on && !s.Muted ? Color.FromArgb(205, 208, 214) : Speaker, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             bells.Add((icon, r.P));
             ry += h;
