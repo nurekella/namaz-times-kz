@@ -54,4 +54,17 @@ public static class Hijri
     }
 
     public static Holiday? On(DateOnly date, int adj) => Upcoming(date, adj).FirstOrDefault(h => h.Date == date);
+
+    /// Why this day is a recommended (sunnah) fast, as a string key, or null. Never in Ramadan (already obligatory)
+    /// or on the Eid days, when fasting is forbidden. Most specific reason first.
+    public static string? SunnahFast(DateOnly date, int adj)
+    {
+        var (_, m, d) = Of(date, adj);
+        if (m == 9 || (m == 10 && d == 1) || (m == 12 && d is >= 10 and <= 13)) return null;
+        if (m == 12 && d == 9) return "FastArafa";
+        if (m == 1 && d is 9 or 10) return "FastAshura";
+        if (d is >= 13 and <= 15) return "FastWhiteDays";
+        if (m == 10 && d is >= 2 and <= 7) return "FastShawwal";
+        return date.DayOfWeek switch { DayOfWeek.Monday => "FastMonday", DayOfWeek.Thursday => "FastThursday", _ => null };
+    }
 }

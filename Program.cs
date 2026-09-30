@@ -10,6 +10,22 @@ public enum FastingMode { Ramadan, Always, Off }
 
 public record City(string Title, string Lat, string Lng);
 
+public class ZakatInput
+{
+    public decimal Cash { get; set; }
+    public decimal GoldGrams { get; set; }
+    public decimal SilverGrams { get; set; }
+    public decimal Goods { get; set; }
+    public decimal Receivables { get; set; }
+    public decimal Debts { get; set; }
+    public decimal GoldPrice { get; set; }
+    public decimal SilverPrice { get; set; }
+    public int NisabBasis { get; set; } = 1; // 0 gold 85 g, 1 silver 595 g, 2 entered manually
+    public decimal NisabManual { get; set; }
+    public decimal FitrAmount { get; set; }
+    public int FitrPeople { get; set; } = 1;
+}
+
 public class Settings
 {
     public City City { get; set; } = new("Алматы қаласы", "43.238293", "76.945465");
@@ -32,6 +48,14 @@ public class Settings
     public int Zoom { get; set; } = 100;
     public int UiScale { get; set; } = 100;
     public Dictionary<string, int> Qada { get; set; } = []; // missed prayers left to make up, by prayer key
+    // Reminders
+    public bool RemindSunnahFasts { get; set; } = true;
+    public bool RemindHolidays { get; set; } = true;
+    public bool RemindKahf { get; set; } = true;
+    public bool RemindAdhkar { get; set; }
+    public bool FullscreenAlert { get; set; }
+    // Zakat and fitr calculators (last entered values, tenge)
+    public ZakatInput Zakat { get; set; } = new();
     public int Opacity { get; set; } = 100;
     public int X { get; set; } = -1;
     public int Y { get; set; } = -1;
@@ -67,6 +91,25 @@ public static class Data
     {
         try { return JsonSerializer.Deserialize<Settings>(File.ReadAllText(SettingsFile), Json) ?? new(); }
         catch { return new(); }
+    }
+
+    /// Backup: the settings file as is (city, qada counters, dhikr counts, zakat values, everything).
+    public static void Export(Settings s, string path)
+    {
+        Save(s);
+        File.Copy(SettingsFile, path, overwrite: true);
+    }
+
+    /// Restore a backup into the live settings object (same instance, so every open window sees it). False if unreadable.
+    public static bool Import(string path, Settings into)
+    {
+        Settings? loaded;
+        try { loaded = JsonSerializer.Deserialize<Settings>(File.ReadAllText(path), Json); }
+        catch { return false; }
+        if (loaded == null) return false;
+        foreach (var p in typeof(Settings).GetProperties().Where(p => p.CanWrite)) p.SetValue(into, p.GetValue(loaded));
+        Save(into);
+        return true;
     }
 
     public static void Save(Settings s)
@@ -230,6 +273,22 @@ static class Program
         var h = Hijri.Of(new DateOnly(2026, 3, 20), 0); // Eid al-Fitr 1447 per Umm al-Qura
         Trace.Assert(h == (1447, 10, 1), $"hijri {h}");
         Trace.Assert(Hijri.ToGregorian(1447, 10, 1, 0) == new DateOnly(2026, 3, 20));
+        Trace.Assert(Hijri.SunnahFast(new DateOnly(2026, 3, 20), 0) == null, "Eid al-Fitr: fasting forbidden");
+        Trace.Assert(Hijri.SunnahFast(Hijri.ToGregorian(1447, 12, 9, 0), 0) == "FastArafa");
+        Trace.Assert(Hijri.SunnahFast(Hijri.ToGregorian(1447, 12, 10, 0), 0) == null, "Eid al-Adha");
+        Trace.Assert(Hijri.SunnahFast(Hijri.ToGregorian(1447, 9, 5, 0), 0) == null, "Ramadan is obligatory, not sunnah");
+        Trace.Assert(Hijri.SunnahFast(Hijri.ToGregorian(1448, 4, 14, 0), 0) == "FastWhiteDays");
+        var monday = Enumerable.Range(0, 7).Select(i => Hijri.ToGregorian(1448, 4, 20, 0).AddDays(i)).First(x => x.DayOfWeek == DayOfWeek.Monday);
+        Trace.Assert(Hijri.SunnahFast(monday, 0) == "FastMonday");
+
+        // Zakat: silver nisab 595 g × 500 ₸ = 297 500 ₸
+        var z = new ZakatInput { Cash = 1_000_000, SilverPrice = 500, NisabBasis = 1 };
+        Trace.Assert(ZakatForm.Nisab(z) == 297_500 && ZakatForm.Due(z) == 25_000, "2.5% above nisab");
+        z.Cash = 100_000;
+        Trace.Assert(ZakatForm.Due(z) == 0, "below nisab");
+        z.Cash = 1_000_000; z.Debts = 800_000;
+        Trace.Assert(ZakatForm.Due(z) == 0, "debts bring it below nisab");
+        Trace.Assert(ZakatForm.Due(new ZakatInput { Cash = 1_000_000, NisabBasis = 1 }) == 0, "unknown nisab: no answer");
         Console.WriteLine("selftest ok");
         return 0;
     }

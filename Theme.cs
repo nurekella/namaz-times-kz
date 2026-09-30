@@ -233,6 +233,7 @@ public class Stepper : FlowLayoutPanel
     int value;
     public int Min, Max, Step;
     public Func<int, string> Format = v => v.ToString();
+    public event Action<int>? ValueChanged;
 
     public Stepper(int value, int min, int max, int step = 1, Func<int, string>? format = null)
     {
@@ -260,7 +261,14 @@ public class Stepper : FlowLayoutPanel
     public int Value
     {
         get => value;
-        set { this.value = Math.Clamp(value, Min, Max); text.Text = Format(this.value); }
+        set
+        {
+            var v = Math.Clamp(value, Min, Max);
+            var changed = v != this.value;
+            this.value = v;
+            text.Text = Format(v);
+            if (changed) ValueChanged?.Invoke(v);
+        }
     }
 }
 

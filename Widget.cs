@@ -10,7 +10,7 @@ public class Widget : Form
     readonly Settings s;
     readonly NotifyIcon tray;
     readonly System.Windows.Forms.Timer timer = new() { Interval = 1000 };
-    readonly ToolStripMenuItem showItem, monthItem, holidaysItem, tasbihItem, namesItem, typesItem, qadaItem, muteItem, settingsItem, checkUpdateItem, updateItem, exitItem;
+    readonly ToolStripMenuItem showItem, monthItem, holidaysItem, tasbihItem, adhkarItem, namesItem, typesItem, qadaItem, zakatItem, muteItem, settingsItem, checkUpdateItem, updateItem, exitItem;
     readonly List<(RectangleF R, P P)> bells = [];
     DateTime lastTick = Clock(), lastUpdateCheck;
     DateOnly shownDate;
@@ -22,7 +22,7 @@ public class Widget : Form
     RectangleF updateBanner;
     RectangleF cityRect;   // location in the header, click = choose city
     bool hotCity;
-    bool balloonIsUpdate;      // last balloon was "new version" → clicking it installs
+    Action? balloonAction;     // what clicking the last notification does (install update, open adhkar...)
     SettingsForm? settingsForm;
     MonthForm? monthForm;
     HolidaysForm? holidaysForm;
@@ -30,6 +30,8 @@ public class Widget : Form
     NamesForm? namesForm;
     PrayerTypesForm? typesForm;
     QadaForm? qadaForm;
+    AdhkarForm? adhkarForm;
+    ZakatForm? zakatForm;
     RectangleF nameCard; // "name of the day" card, clickable
     bool full, hover;          // fullscreen mode; mouse over widget (shows window buttons)
     int hot = -1, fullZoom = 100;
@@ -60,6 +62,8 @@ public class Widget : Form
         monthItem = Theme.MenuItem('', (_, _) => Open(ref monthForm, () => new MonthForm(s)));
         holidaysItem = Theme.MenuItem('', (_, _) => Open(ref holidaysForm, () => new HolidaysForm(s)));
         tasbihItem = Theme.MenuItem('', (_, _) => OpenTasbih()); // RadioBullet, a bead
+        adhkarItem = Theme.MenuItem('', (_, _) => OpenAdhkar()); // Brightness (sun)
+        zakatItem = Theme.MenuItem('', (_, _) => OpenZakat());   // PaymentCard
         qadaItem = Theme.MenuItem('', (_, _) => OpenQada()); // History
         typesItem = Theme.MenuItem('', (_, _) => OpenTypes()); // ReadingMode (open book)
         namesItem = Theme.MenuItem('', (_, _) => OpenNames());   // Dictionary (book)
@@ -69,13 +73,13 @@ public class Widget : Form
         updateItem = Theme.MenuItem('', (_, _) => _ = InstallUpdate());
         updateItem.Visible = false;
         exitItem = Theme.MenuItem('', (_, _) => { tray!.Visible = false; Application.Exit(); });
-        menu.Items.AddRange([showItem, monthItem, holidaysItem, tasbihItem, namesItem, typesItem, qadaItem, new ToolStripSeparator(), muteItem, settingsItem, checkUpdateItem, updateItem,
+        menu.Items.AddRange([showItem, monthItem, holidaysItem, tasbihItem, adhkarItem, namesItem, typesItem, qadaItem, zakatItem, new ToolStripSeparator(), muteItem, settingsItem, checkUpdateItem, updateItem,
             new ToolStripSeparator(), exitItem]);
         menu.Opening += (_, _) => { showItem.Checked = Visible; muteItem.Checked = s.Muted; };
         ContextMenuStrip = menu;
 
         tray = new NotifyIcon { Icon = Theme.AppIcon(SystemInformation.SmallIconSize), Text = Text, ContextMenuStrip = menu, Visible = true };
-        tray.BalloonTipClicked += (_, _) => { if (balloonIsUpdate) _ = InstallUpdate(); };
+        tray.BalloonTipClicked += (_, _) => balloonAction?.Invoke();
         tray.MouseClick +=(_, e) =>
         {
             if (e.Button != MouseButtons.Left) return;
@@ -107,6 +111,8 @@ public class Widget : Form
         namesItem.Text = L.T("Names99");
         typesItem.Text = L.T("PrayerTypes");
         qadaItem.Text = L.T("Qada");
+        adhkarItem.Text = L.T("Adhkar");
+        zakatItem.Text = L.T("Zakat");
         muteItem.Text = L.T("Mute");
         settingsItem.Text = L.T("Settings");
         checkUpdateItem.Text = L.T("CheckUpdates");
@@ -235,10 +241,11 @@ public class Widget : Form
         if (v) { Show(); Activate(); } else Hide();
     }
 
-    void Notify(string title, string text)
+    /// Shows a notification; onClick runs if the user clicks it (e.g. open the adhkar window).
+    void Notify(string title, string text, Action? onClick = null)
     {
         if (s.Muted) return;
-        balloonIsUpdate = false;
+        balloonAction = onClick;
         tray.ShowBalloonTip(10000, title, text, ToolTipIcon.None);
     }
 
@@ -246,8 +253,49 @@ public class Widget : Form
     public void TestAlert()
     {
         var (p, t) = next ?? (P.Fajr, DateTime.Today.AddHours(5));
-        balloonIsUpdate = false;
+        balloonAction = null;
         tray.ShowBalloonTip(10000, $"{L.Name(p)} — {L.Time(t)}", $"{L.T("PrayerTime")} · {s.City.Title}", ToolTipIcon.None);
+    }
+
+    /// Daily reminders besides prayer times: sunnah fasts, holidays, al-Kahf on Friday, morning/evening adhkar,
+    /// fitr sadaqa. Each fires once when its moment is crossed; staggered so balloons don't replace each other.
+    void Reminders(DateOnly date, Func<DateTime, bool> crossed)
+    {
+        if (today == null) return;
+        var place = s.City.Title;
+        var (_, hm, hd) = Hijri.Of(date, s.HijriAdjust);
+
+        // 20 min after Isha: what tomorrow brings (a sunnah fast and/or a holiday).
+        if (Find(today, P.Isha) is { } isha && crossed(isha.AddMinutes(20)))
+        {
+            var tomorrow = date.AddDays(1);
+            var lines = new List<string>();
+            if (s.RemindSunnahFasts && Hijri.SunnahFast(tomorrow, s.HijriAdjust) is { } why) lines.Add(L.T("FastTomorrow") + ": " + L.T(why));
+            if (s.RemindHolidays && Hijri.On(tomorrow, s.HijriAdjust) is { Night: false } h) lines.Add(string.Format(L.T("HolidayTomorrow"), L.T(h.Key)));
+            if (s.RemindHolidays && hm == 9 && hd == 27) lines.Add(FitrReminder());
+            if (lines.Count > 0) Notify(L.T("Reminder"), string.Join("\n", lines));
+        }
+        if (Find(today, P.Maghrib) is { } maghrib)
+        {
+            if (s.RemindHolidays && holiday is { Night: true } nh && crossed(maghrib.AddMinutes(5)))
+                Notify(string.Format(L.T("HolidayTonight"), L.T(nh.Key)), place);
+            if (s.RemindKahf && date.DayOfWeek == DayOfWeek.Thursday && crossed(maghrib.AddMinutes(10)))
+                Notify(L.T("KahfTitle"), L.T("KahfText"));
+        }
+        if (s.RemindKahf && date.DayOfWeek == DayOfWeek.Friday && Find(today, P.Sunrise) is { } sunrise && crossed(sunrise.AddMinutes(60)))
+            Notify(L.T("KahfTitle"), L.T("KahfText"));
+        if (s.RemindAdhkar && Find(today, P.Fajr) is { } fajr && crossed(fajr.AddMinutes(15)))
+            Notify(L.T("AdhkarMorningTitle"), L.T("AdhkarTap"), () => OpenAdhkar(true));
+        if (s.RemindAdhkar && Find(today, P.Asr) is { } asr && crossed(asr.AddMinutes(15)))
+            Notify(L.T("AdhkarEveningTitle"), L.T("AdhkarTap"), () => OpenAdhkar(false));
+    }
+
+    string FitrReminder()
+    {
+        var z = s.Zakat;
+        return z.FitrAmount > 0
+            ? string.Format(L.T("FitrReminderAmount"), (z.FitrAmount * z.FitrPeople).ToString("N0", L.Culture) + " ₸")
+            : L.T("FitrReminder");
     }
 
     void Tick()
@@ -275,10 +323,15 @@ public class Widget : Form
                 Notify(L.T("Jumuah"), $"{L.Name(P.Dhuhr)} {L.Time(t)} · {place}");
             if (!s.Alerts.Contains(p)) continue;
             if (Crossed(t))
+            {
                 Notify($"{L.Name(p)} — {L.Time(t)}", $"{L.T("PrayerTime")} · {place}");
+                if (s.FullscreenAlert && !s.Muted && p is P.Fajr or P.Dhuhr or P.Asr or P.Maghrib or P.Isha)
+                    new PrayerOverlay(string.Format(L.T("OverlayTitle"), L.Name(p)), $"{L.Time(t)} · {place}").Show();
+            }
             if (s.RemindBefore > 0 && Crossed(t.AddMinutes(-s.RemindBefore)))
                 Notify(string.Format(L.T("InMin"), L.Name(p), s.RemindBefore), $"{L.Time(t)} · {place}");
         }
+        Reminders(date, Crossed);
         lastTick = now;
 
         if (now - lastUpdateCheck > TimeSpan.FromHours(24) && Updates.Repo != null)
@@ -301,7 +354,7 @@ public class Widget : Form
         {
             if (await Updates.Check() is not { } u || update?.Version == u.Version) return;
             SetUpdate(u);
-            balloonIsUpdate = true;
+            balloonAction = () => _ = InstallUpdate();
             tray.ShowBalloonTip(10000, "Namaz Times KZ", string.Format(L.T("UpdateAvail"), "v" + u.Version.ToString(3)), ToolTipIcon.None);
         }
         catch { /* offline or rate-limited: try again tomorrow */ }
@@ -691,6 +744,13 @@ public class Widget : Form
     void OpenNames() => Open(ref namesForm, () => new NamesForm());
     void OpenTypes() => Open(ref typesForm, () => new PrayerTypesForm());
     void OpenQada() => Open(ref qadaForm, () => new QadaForm(s));
+    void OpenZakat() => Open(ref zakatForm, () => new ZakatForm(s));
+    void OpenAdhkar(bool? morning = null)
+    {
+        adhkarForm?.Close(); // reopen on the requested tab (morning / evening)
+        adhkarForm = new AdhkarForm(morning) { TopMost = TopMost };
+        adhkarForm.Show();
+    }
 
     void OpenSettings()
     {

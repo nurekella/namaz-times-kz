@@ -98,8 +98,21 @@ public class SettingsForm : Form
         // Layout: two columns of cards + footer
         var left = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Margin = new Padding(0, 0, Theme.Dp(12), 0) };
         left.Controls.AddRange([general, notif, widget]);
+        // Reminders besides prayer times
+        var reminders = Theme.Section(L.T("Reminders"), out var g5);
+        var remFasts = new Toggle(s.RemindSunnahFasts);
+        Row(g5, L.T("RemFasts"), remFasts);
+        var remHolidays = new Toggle(s.RemindHolidays);
+        Row(g5, L.T("RemHolidays"), remHolidays);
+        var remKahf = new Toggle(s.RemindKahf);
+        Row(g5, L.T("RemKahf"), remKahf);
+        var remAdhkar = new Toggle(s.RemindAdhkar);
+        Row(g5, L.T("RemAdhkar"), remAdhkar);
+        var fullscreen = new Toggle(s.FullscreenAlert);
+        Row(g5, L.T("RemFullscreen"), fullscreen);
+
         var right = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
-        right.Controls.Add(prayers);
+        right.Controls.AddRange([prayers, reminders]);
 
         var save = Theme.Button(L.T("Save"), primary: true);
         var cancel = Theme.Button(L.T("Cancel"));
@@ -111,7 +124,25 @@ public class SettingsForm : Form
         var check = Theme.Button("↻ " + L.T("CheckUpdates"));
         check.Click += async (_, _) => { check.Enabled = false; try { await (checkUpdates?.Invoke(this) ?? Task.CompletedTask); } finally { check.Enabled = true; } };
         var about = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.Left, Margin = Padding.Empty };
-        about.Controls.AddRange([version, check]);
+        // Backup: export the settings file / import it back (e.g. on a new computer)
+        var export = Theme.Button("⭳ " + L.T("Export"));
+        var import = Theme.Button("⭱ " + L.T("Import"));
+        export.Click += (_, _) =>
+        {
+            using var d = new SaveFileDialog { FileName = "NamazTimes-settings.json", Filter = "JSON|*.json" };
+            if (d.ShowDialog(this) != DialogResult.OK) return;
+            Data.Export(s, d.FileName);
+            MessageBox.Show(this, L.T("Exported"), Text);
+        };
+        import.Click += (_, _) =>
+        {
+            using var d = new OpenFileDialog { Filter = "JSON|*.json" };
+            if (d.ShowDialog(this) != DialogResult.OK) return;
+            if (!Data.Import(d.FileName, s)) { MessageBox.Show(this, L.T("ImportFailed"), Text); return; }
+            DialogResult = DialogResult.OK; // closing as "saved" makes the widget apply the imported settings
+            Close();
+        };
+        about.Controls.AddRange([version, check, export, import]);
 
         var root = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Padding = new Padding(Theme.Dp(16)) };
         root.Controls.Add(left); root.Controls.Add(right);
@@ -154,6 +185,11 @@ public class SettingsForm : Form
             s.Opacity = opacity.Value;
             s.TopMost = topMost.Checked;
             s.ShowNameOfDay = nameOfDay.Checked;
+            s.RemindSunnahFasts = remFasts.Checked;
+            s.RemindHolidays = remHolidays.Checked;
+            s.RemindKahf = remKahf.Checked;
+            s.RemindAdhkar = remAdhkar.Checked;
+            s.FullscreenAlert = fullscreen.Checked;
             s.Hidden = rows.Where(r => !r.show.Checked).Select(r => r.p).ToHashSet();
             s.Alerts = rows.Where(r => r.notify.Checked).Select(r => r.p).ToHashSet();
             s.Offsets = rows.Where(r => r.off.Value != 0).ToDictionary(r => r.p, r => r.off.Value);
