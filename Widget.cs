@@ -17,7 +17,10 @@ public class Widget : Form
     List<(P P, DateTime At)>? today;
     (P P, DateTime At)? next;
     Hijri.Holiday? holiday;
-    string? updateUrl;
+    Updates.Release? update;
+    int? downloading;          // update download progress, %
+    RectangleF updateBanner;
+    bool balloonIsUpdate;      // last balloon was "new version" → clicking it installs
     SettingsForm? settingsForm;
     MonthForm? monthForm;
     HolidaysForm? holidaysForm;
@@ -56,7 +59,7 @@ public class Widget : Form
         namesItem = Theme.MenuItem('', (_, _) => OpenNames());   // Dictionary (book)
         muteItem = Theme.MenuItem('', (_, _) => { s.Muted = !s.Muted; Data.Save(s); Invalidate(); });
         settingsItem = Theme.MenuItem('', (_, _) => OpenSettings());
-        updateItem = Theme.MenuItem('', (_, _) => Process.Start(new ProcessStartInfo(updateUrl!) { UseShellExecute = true }));
+        updateItem = Theme.MenuItem('', (_, _) => _ = InstallUpdate());
         updateItem.Visible = false;
         exitItem = Theme.MenuItem('', (_, _) => { tray!.Visible = false; Application.Exit(); });
         menu.Items.AddRange([showItem, monthItem, holidaysItem, tasbihItem, namesItem, new ToolStripSeparator(), muteItem, settingsItem, updateItem,
@@ -65,7 +68,8 @@ public class Widget : Form
         ContextMenuStrip = menu;
 
         tray = new NotifyIcon { Icon = Theme.AppIcon(SystemInformation.SmallIconSize), Text = Text, ContextMenuStrip = menu, Visible = true };
-        tray.MouseClick += (_, e) =>
+        tray.BalloonTipClicked += (_, _) => { if (balloonIsUpdate) _ = InstallUpdate(); };
+        tray.MouseClick +=(_, e) =>
         {
             if (e.Button != MouseButtons.Left) return;
             if (WindowState == FormWindowState.Minimized) { WindowState = FormWindowState.Normal; Activate(); }
@@ -153,7 +157,7 @@ public class Widget : Form
     int CardHeight => 6 + Math.Max(rows.Sum(r => r.H), 60) + 4 + (fast != null ? 38 : 0) + 38;
     const int TopStrip = 24; // free space above the header for the minimize/fullscreen/close buttons
     const int NameCardHeight = 100;
-    int ContentHeight => TopStrip + 6 + HeaderLines * 19 + 8 + CardHeight + (s.ShowNameOfDay ? 10 + NameCardHeight : 0) + 12; // at 96 dpi, zoom 100
+    int ContentHeight => TopStrip + 6 + HeaderLines * 19 + 8 + (update != null ? 36 : 0) + CardHeight + (s.ShowNameOfDay ? 10 + NameCardHeight : 0) + 12; // at 96 dpi, zoom 100
     Size SizeFor() => new(Zi(BaseWidth), Zi(ContentHeight));
 
     void Relayout()
@@ -216,13 +220,16 @@ public class Widget : Form
 
     void Notify(string title, string text)
     {
-        if (!s.Muted) tray.ShowBalloonTip(10000, title, text, ToolTipIcon.None);
+        if (s.Muted) return;
+        balloonIsUpdate = false;
+        tray.ShowBalloonTip(10000, title, text, ToolTipIcon.None);
     }
 
     /// Sample alert for the next prayer, exactly as a real one looks (ignores mute).
     public void TestAlert()
     {
         var (p, t) = next ?? (P.Fajr, DateTime.Today.AddHours(5));
+        balloonIsUpdate = false;
         tray.ShowBalloonTip(10000, $"{L.Name(p)} — {L.Time(t)}", $"{L.T("PrayerTime")} · {s.City.Title}", ToolTipIcon.None);
     }
 
@@ -274,13 +281,44 @@ public class Widget : Form
     {
         try
         {
-            if (await Updates.Check() is not { } u || updateUrl == u.Url) return;
-            updateUrl = u.Url;
-            updateItem.Text = string.Format(L.T("Update"), "v" + u.Version.ToString(3));
+            if (await Updates.Check() is not { } u || update?.Version == u.Version) return;
+            update = u;
+            var v = "v" + u.Version.ToString(3);
+            updateItem.Text = string.Format(L.T("Update"), v);
             updateItem.Visible = true;
-            tray.ShowBalloonTip(10000, "Namaz Times KZ", string.Format(L.T("UpdateAvail"), "v" + u.Version.ToString(3)), ToolTipIcon.None);
+            balloonIsUpdate = true;
+            tray.ShowBalloonTip(10000, "Namaz Times KZ", string.Format(L.T("UpdateAvail"), v), ToolTipIcon.None);
+            if (IsHandleCreated) Relayout(); // room for the update banner
         }
         catch { /* offline or rate-limited: try again tomorrow */ }
+    }
+
+    /// Download and install the found update, then exit so the installer can replace us.
+    async Task InstallUpdate()
+    {
+        if (update == null || downloading != null) return;
+        downloading = 0;
+        Invalidate();
+        try
+        {
+            await Updates.Download(update, new Progress<int>(p => { downloading = p; Invalidate(); }));
+            tray.Visible = false;
+            Application.Exit();
+        }
+        catch
+        {
+            downloading = null;
+            Invalidate();
+            MessageBox.Show(this, L.T("UpdateFailed"), "Namaz Times KZ");
+            Process.Start(new ProcessStartInfo(update.Page) { UseShellExecute = true });
+        }
+    }
+
+    /// For the --update flag: check right now and install if there is something newer.
+    public async Task UpdateNow()
+    {
+        await CheckUpdates();
+        await InstallUpdate();
     }
 
     static string Fmt(TimeSpan t) => $"{(int)t.TotalHours:00}:{t.Minutes:00}:{t.Seconds:00}";
@@ -342,6 +380,28 @@ public class Widget : Form
             y += Z(19);
         }
         y += Z(8);
+
+        // Update banner: "New version — update" (click installs), then download progress.
+        updateBanner = RectangleF.Empty;
+        if (update != null)
+        {
+            updateBanner = new RectangleF(ox + Z(12), y, cw - Z(24), Z(28));
+            using var bp = Theme.RoundRect(updateBanner, Z(8));
+            using (var bb = new SolidBrush(Color.FromArgb(downloading == null ? 70 : 40, Green))) g.FillPath(bb, bp);
+            using (var bpen = new Pen(Green, Math.Max(1, Z(1)))) g.DrawPath(bpen, bp);
+            if (downloading is { } pct) // progress fill
+            {
+                g.SetClip(bp);
+                using var pf = new SolidBrush(Color.FromArgb(120, Green));
+                g.FillRectangle(pf, updateBanner.X, updateBanner.Y, updateBanner.Width * pct / 100f, updateBanner.Height);
+                g.ResetClip();
+            }
+            var text = downloading is { } d ? string.Format(L.T("Downloading"), d)
+                : string.Format(L.T("UpdateBanner"), "v" + update.Version.ToString(3));
+            TextRenderer.DrawText(g, text, small, Rectangle.Round(updateBanner), Color.White,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            y += Z(36);
+        }
 
         // Card with prayer rows.
         var card = new RectangleF(ox + Z(12), y, cw - Z(24), Z(CardHeight));
@@ -471,6 +531,7 @@ public class Widget : Form
             case 2: if (full) ToggleFull(); SetWidgetVisible(false); return;
         }
         if (nameCard.Contains(e.Location)) { OpenNames(); return; }
+        if (updateBanner.Contains(e.Location)) { _ = InstallUpdate(); return; }
         foreach (var (r, p) in bells)
             if (r.Contains(e.Location))
             {
@@ -498,7 +559,7 @@ public class Widget : Form
             if (t >= 0) tip.Show(L.T(ToolTips[t]), this, Point.Round(new PointF(tools[t].Left, tools[t].Bottom + Z(4))), 2500);
             else tip.Hide(this);
         }
-        Cursor = h >= 0 || t >= 0 || nameCard.Contains(e.Location) || bells.Any(b => b.R.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
+        Cursor = h >= 0 || t >= 0 || nameCard.Contains(e.Location) || updateBanner.Contains(e.Location) || bells.Any(b => b.R.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
     }
 
     protected override void OnMouseLeave(EventArgs e)

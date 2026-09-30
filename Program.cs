@@ -189,6 +189,8 @@ static class Program
         var widget = new Widget(Data.LoadSettings());
         _ = widget.Handle; // needed for BeginInvoke even while the widget starts hidden
         new Thread(() => { while (showSignal.WaitOne()) widget.BeginInvoke(widget.BringBack); }) { IsBackground = true }.Start();
+        if (args.Contains("--update")) // check GitHub now and install a newer version if there is one
+            widget.BeginInvoke(async () => await widget.UpdateNow());
         if (args.Contains("--test-alert")) // show a sample notification shortly after start
             widget.Load += async (_, _) => { await Task.Delay(1500); widget.TestAlert(); };
         Application.Run(widget);
