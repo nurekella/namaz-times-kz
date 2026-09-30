@@ -469,7 +469,8 @@ public class Widget : Form
 
             // Speaker: click toggles this prayer's notification.
             var on = s.Alerts.Contains(r.P);
-            var icon = new RectangleF(box.X - Z(30), ry, Z(24), h);
+            // Speaker column sits in the middle of the card, between the names and the times.
+            var icon = new RectangleF(Math.Min(card.X + card.Width / 2 + Z(4), box.X - Z(36)), ry, Z(24), h);
             // Volume3 vs Mute: both start at the same x and are nearly the same width, so the column lines up.
             TextRenderer.DrawText(g, on ? "" : "", icons, Rectangle.Round(icon),
                 on && !s.Muted ? Color.FromArgb(205, 208, 214) : Speaker, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
