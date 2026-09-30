@@ -23,5 +23,9 @@ jobs:
       - name: MSI
         run: dotnet build installer -c Release -p:ProductVersion=${GITHUB_REF_NAME#v} -p:ExePath=../out/NamazTimes.exe -o msi
       - name: Release
-        run: gh release create "$GITHUB_REF_NAME" out/NamazTimes.exe msi/*.msi --generate-notes
+        run: |
+          NOTES="Windows 10/11: **NamazTimes-${GITHUB_REF_NAME#v}.msi** (installer) or **NamazTimes.exe** (portable).
+
+          [Code signing policy](https://github.com/$GITHUB_REPOSITORY#code-signing-policy) · [Privacy policy](https://github.com/$GITHUB_REPOSITORY#privacy-policy)"
+          gh release create "$GITHUB_REF_NAME" out/NamazTimes.exe msi/*.msi --notes "$NOTES" --generate-notes
         env: { GH_TOKEN: '${{ github.token }}' }

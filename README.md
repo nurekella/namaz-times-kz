@@ -5,6 +5,10 @@ Windows-қа арналған намаз уақыттары: жұмыс үсте
 
 Интерфейс тілдері: қазақша · орысша · ағылшынша.
 
+> **English:** Namaz Times KZ is a free, open-source prayer times app for Windows 10/11. It shows official prayer times
+> of the Spiritual Administration of Muslims of Kazakhstan (muftyat.kz) for any of 5,700+ places in Kazakhstan in a desktop widget,
+> with notifications, a monthly timetable, Islamic holidays, Ramadan suhoor/iftar countdown, a dhikr counter and the 99 Names of Allah.
+
 <img src="docs/screenshot.png" width="260" alt="виджет"> <img src="docs/settings.png" width="520" alt="баптаулар">
 
 ## Жүктеп алу
@@ -18,6 +22,13 @@ Windows-қа арналған намаз уақыттары: жұмыс үсте
 
 > Файлдарға цифрлық қолтаңба қойылмаған, сондықтан алғаш іске қосқанда Windows SmartScreen ескерту көрсетуі мүмкін:
 > «Толығырақ» → «Бәрібір іске қосу» басыңыз.
+
+### Жою / Uninstall
+
+- **MSI**: «Параметрлер» → «Қолданбалар» → «Namaz Times KZ» → «Жою». / *Settings → Apps → Namaz Times KZ → Uninstall.*
+- **NamazTimes.exe**: мәзірден «Шығу», содан кейін файлды және `%AppData%\NamazTimes` қалтасын жойыңыз;
+  «Windows-пен бірге іске қосу» қосулы болса, алдымен баптаулардан өшіріңіз.
+  / *Exit from the menu, turn off "Start with Windows" in settings, then delete the file and the `%AppData%\NamazTimes` folder.*
 
 ## Мүмкіндіктер
 
@@ -59,6 +70,32 @@ dotnet build -c Release
 Елді мекендер тізімін жаңарту: `node tools/cities.mjs`.
 
 99 есімнің мәтіндері (оқылуы мен мағынасы) — [names99.json](names99.json). Түзетулерді қош көреміз.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+*(Application pending — releases up to v0.4.0 are not signed yet.)*
+
+- Committers and reviewers: [@nurekella](https://github.com/nurekella)
+- Approvers: [@nurekella](https://github.com/nurekella)
+
+Only binaries built by GitHub Actions from this repository ([release workflow](.github/workflows/release.yml)) are signed.
+Every release is approved manually before signing.
+
+## Privacy policy
+
+This program will not transfer any information to other networked systems unless specifically requested by the user
+or the person installing or operating it. The only network requests it makes are:
+
+- `api.muftyat.kz` — downloads the yearly prayer timetable for the location **you choose** (its coordinates are part of the request);
+- `api.github.com` / `github.com` — checks this repository's Releases for a newer version once a day and, only when you click
+  "update", downloads it.
+
+No personal data, usage statistics or identifiers are collected or sent. Settings and the cached timetable are stored locally
+in `%AppData%\NamazTimes`.
+
+Бағдарлама ешқандай жеке дерек жинамайды және жібермейді. Желіге тек екі жерге жүгінеді: таңдалған елді мекеннің кестесі үшін
+`api.muftyat.kz` және жаңа нұсқаны тексеру/жүктеу үшін GitHub.
 
 ## Лицензия
 
