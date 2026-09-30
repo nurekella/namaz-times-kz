@@ -2,7 +2,7 @@ namespace NamazTimes;
 
 public class SettingsForm : Form
 {
-    public SettingsForm(Settings s, Action? testAlert = null)
+    public SettingsForm(Settings s, Action? testAlert = null, Func<IWin32Window, Task>? checkUpdates = null)
     {
         Theme.Apply(this);
         Text = "Namaz Times KZ — " + L.T("Settings");
@@ -106,10 +106,14 @@ public class SettingsForm : Form
         var buttons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Right, Margin = Padding.Empty };
         buttons.Controls.AddRange([cancel, save]);
         var version = Theme.Label($"v{Updates.Current.ToString(3)} · muftyat.kz", Theme.Muted, 8.5f);
+        var check = Theme.Button("↻ " + L.T("CheckUpdates"));
+        check.Click += async (_, _) => { check.Enabled = false; try { await (checkUpdates?.Invoke(this) ?? Task.CompletedTask); } finally { check.Enabled = true; } };
+        var about = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.Left, Margin = Padding.Empty };
+        about.Controls.AddRange([version, check]);
 
         var root = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Padding = new Padding(Theme.Dp(16)) };
         root.Controls.Add(left); root.Controls.Add(right);
-        root.Controls.Add(version); root.Controls.Add(buttons);
+        root.Controls.Add(about); root.Controls.Add(buttons);
         Controls.Add(root);
 
         // Shown modeless, so DialogResult alone doesn't close the window.

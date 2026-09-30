@@ -34,6 +34,18 @@ public class NamesForm : Form
 {
     readonly List<Tile> tiles = [];
     Name99 selected;
+    Action<int> step = _ => { };
+    TextBox? searchBox;
+
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        if (searchBox is { Focused: false } && keyData is Keys.Left or Keys.Right)
+        {
+            step(keyData == Keys.Right ? 1 : -1);
+            return true;
+        }
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
 
     public NamesForm()
     {
@@ -53,19 +65,37 @@ public class NamesForm : Form
         var detail = new DetailPanel(this) { Dock = DockStyle.Bottom, Height = Theme.Dp(170) };
         var grid = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(0, Theme.Dp(8), 0, Theme.Dp(8)) };
         grid.HandleCreated += (_, _) => Theme.DarkScrollbars(grid);
+        void Select(Name99 n)
+        {
+            selected = n;
+            tiles.ForEach(x => { x.Selected = x.Item == n; x.Invalidate(); });
+            detail.Invalidate();
+            if (tiles[n.N - 1].Visible) grid.ScrollControlIntoView(tiles[n.N - 1]);
+        }
         foreach (var n in Name99.All.Value)
         {
             var t = new Tile(n, n == today) { Selected = n == selected };
-            t.Click += (_, _) =>
-            {
-                selected = n;
-                tiles.ForEach(x => { x.Selected = x.Item == n; x.Invalidate(); });
-                detail.Invalidate();
-            };
+            t.Click += (_, _) => Select(n);
             tiles.Add(t);
         }
         grid.Controls.AddRange([.. tiles]);
         Controls.AddRange([grid, detail, search]);
+
+        // ‹ › under the details: previous / next name (wraps around 1 ↔ 99); arrow keys do the same.
+        step = d => Select(Name99.All.Value[(selected.N - 1 + d + 99) % 99]);
+        var prev = Theme.Button("‹ " + L.T("Prev"));
+        var next = Theme.Button(L.T("Next") + " ›", primary: true);
+        prev.Click += (_, _) => step(-1);
+        next.Click += (_, _) => step(1);
+        var nav = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Theme.Card, Padding = Padding.Empty };
+        nav.Controls.AddRange([prev, next]);
+        detail.Controls.Add(nav);
+        void PlaceNav() => nav.Location = new Point(detail.Width - nav.Width - Theme.Dp(14), detail.Height - nav.Height - Theme.Dp(12));
+        detail.Resize += (_, _) => PlaceNav();
+        nav.SizeChanged += (_, _) => PlaceNav();
+        detail.Layout += (_, _) => PlaceNav();
+        Shown += (_, _) => PlaceNav();
+        searchBox = search;
 
         search.TextChanged += (_, _) =>
         {
@@ -135,7 +165,7 @@ public class NamesForm : Form
             using var mean = Theme.UI(11f);
             using var small = Theme.UI(9f);
             var arW = Theme.Dp(240);
-            TextRenderer.DrawText(g, n.Ar, ar, new Rectangle(Width - arW - Theme.Dp(12), (int)r.Y, arW, (int)r.Height), Theme.Text,
+            TextRenderer.DrawText(g, n.Ar, ar, new Rectangle(Width - arW - Theme.Dp(12), (int)r.Y, arW, (int)r.Height - Theme.Dp(48)), Theme.Text,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.RightToLeft);
             int x = Theme.Dp(18), w = Width - arW - Theme.Dp(36);
             TextRenderer.DrawText(g, $"{n.N} / 99", small, new Point(x, (int)r.Y + Theme.Dp(12)), Gold);

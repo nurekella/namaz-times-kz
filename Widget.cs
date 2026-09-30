@@ -10,7 +10,7 @@ public class Widget : Form
     readonly Settings s;
     readonly NotifyIcon tray;
     readonly System.Windows.Forms.Timer timer = new() { Interval = 1000 };
-    readonly ToolStripMenuItem showItem, monthItem, holidaysItem, tasbihItem, namesItem, muteItem, settingsItem, updateItem, exitItem;
+    readonly ToolStripMenuItem showItem, monthItem, holidaysItem, tasbihItem, namesItem, muteItem, settingsItem, checkUpdateItem, updateItem, exitItem;
     readonly List<(RectangleF R, P P)> bells = [];
     DateTime lastTick = Clock(), lastUpdateCheck;
     DateOnly shownDate;
@@ -59,10 +59,11 @@ public class Widget : Form
         namesItem = Theme.MenuItem('', (_, _) => OpenNames());   // Dictionary (book)
         muteItem = Theme.MenuItem('', (_, _) => { s.Muted = !s.Muted; Data.Save(s); Invalidate(); });
         settingsItem = Theme.MenuItem('', (_, _) => OpenSettings());
+        checkUpdateItem = Theme.MenuItem('', (_, _) => _ = CheckUpdatesNow()); // Sync
         updateItem = Theme.MenuItem('', (_, _) => _ = InstallUpdate());
         updateItem.Visible = false;
         exitItem = Theme.MenuItem('', (_, _) => { tray!.Visible = false; Application.Exit(); });
-        menu.Items.AddRange([showItem, monthItem, holidaysItem, tasbihItem, namesItem, new ToolStripSeparator(), muteItem, settingsItem, updateItem,
+        menu.Items.AddRange([showItem, monthItem, holidaysItem, tasbihItem, namesItem, new ToolStripSeparator(), muteItem, settingsItem, checkUpdateItem, updateItem,
             new ToolStripSeparator(), exitItem]);
         menu.Opening += (_, _) => { showItem.Checked = Visible; muteItem.Checked = s.Muted; };
         ContextMenuStrip = menu;
@@ -98,7 +99,8 @@ public class Widget : Form
         tasbihItem.Text = L.T("Tasbih");
         namesItem.Text = L.T("Names99");
         muteItem.Text = L.T("Mute");
-        settingsItem.Text = L.T("Settings") + "…";
+        settingsItem.Text = L.T("Settings");
+        checkUpdateItem.Text = L.T("CheckUpdates");
         exitItem.Text = L.T("Exit");
         TopMost = s.TopMost;
         Opacity = Math.Clamp(s.Opacity, 30, 100) / 100.0;
@@ -288,15 +290,38 @@ public class Widget : Form
         try
         {
             if (await Updates.Check() is not { } u || update?.Version == u.Version) return;
-            update = u;
-            var v = "v" + u.Version.ToString(3);
-            updateItem.Text = string.Format(L.T("Update"), v);
-            updateItem.Visible = true;
+            SetUpdate(u);
             balloonIsUpdate = true;
-            tray.ShowBalloonTip(10000, "Namaz Times KZ", string.Format(L.T("UpdateAvail"), v), ToolTipIcon.None);
-            if (IsHandleCreated) Relayout(); // room for the update banner
+            tray.ShowBalloonTip(10000, "Namaz Times KZ", string.Format(L.T("UpdateAvail"), "v" + u.Version.ToString(3)), ToolTipIcon.None);
         }
         catch { /* offline or rate-limited: try again tomorrow */ }
+    }
+
+    void SetUpdate(Updates.Release u)
+    {
+        update = u;
+        updateItem.Text = string.Format(L.T("Update"), "v" + u.Version.ToString(3));
+        updateItem.Visible = true;
+        if (IsHandleCreated) Relayout(); // room for the update banner
+    }
+
+    /// "Check for updates" from the menu or settings: always answers, and offers to install right away.
+    public async Task CheckUpdatesNow(IWin32Window? owner = null)
+    {
+        owner ??= this;
+        const string title = "Namaz Times KZ";
+        if (Updates.Repo == null) { MessageBox.Show(owner, L.T("DevBuild"), title); return; }
+        Updates.Release? u;
+        try { u = await Updates.Check(); }
+        catch { MessageBox.Show(owner, L.T("UpdateCheckFailed"), title); return; }
+        if (u == null)
+        {
+            MessageBox.Show(owner, string.Format(L.T("UpToDate"), "v" + Updates.Current.ToString(3)), title);
+            return;
+        }
+        SetUpdate(u);
+        if (MessageBox.Show(owner, string.Format(L.T("UpdateAsk"), "v" + u.Version.ToString(3)), title, MessageBoxButtons.YesNo) == DialogResult.Yes)
+            await InstallUpdate();
     }
 
     /// Download and install the found update, then exit so the installer can replace us.
@@ -639,7 +664,7 @@ public class Widget : Form
     void OpenSettings()
     {
         if (settingsForm is { IsDisposed: false }) { settingsForm.Activate(); return; }
-        settingsForm = new SettingsForm(s, TestAlert) { TopMost = TopMost };
+        settingsForm = new SettingsForm(s, TestAlert, CheckUpdatesNow) { TopMost = TopMost };
         settingsForm.FormClosed += (_, _) =>
         {
             if (settingsForm.DialogResult != DialogResult.OK) return;
