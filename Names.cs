@@ -1,0 +1,146 @@
+using System.Drawing.Drawing2D;
+using System.Drawing.Text;
+using System.Text.Json;
+
+namespace NamazTimes;
+
+/// One of the 99 names of Allah. Texts live in names99.json so they can be reviewed without touching code.
+public record Name99(int N, string Ar, string Kk, string Ru, string En, string Mkk, string Mru, string Men)
+{
+    public string Translit => L.Lang switch { "kk" => Kk, "en" => En, _ => Ru };
+    public string Meaning => L.Lang switch { "kk" => Mkk, "en" => Men, _ => Mru };
+
+    public static readonly Lazy<List<Name99>> All = new(() =>
+    {
+        var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        using var stream = typeof(Name99).Assembly.GetManifestResourceStream("names99.json")!;
+        return JsonSerializer.Deserialize<List<JsonElement>>(stream, opts)!.Select((e, i) => new Name99(i + 1,
+            e.GetProperty("ar").GetString()!, e.GetProperty("kk").GetString()!, e.GetProperty("ru").GetString()!,
+            e.GetProperty("en").GetString()!, e.GetProperty("mkk").GetString()!, e.GetProperty("mru").GetString()!,
+            e.GetProperty("men").GetString()!)).ToList();
+    });
+
+    /// A different name every day, cycling through all 99.
+    public static Name99 OfDay(DateOnly d) => All.Value[d.DayNumber % 99];
+
+    /// Best installed font for vocalised Arabic (the nicer ones are optional Windows features).
+    public static readonly string ArabicFont = new[] { "Sakkal Majalla", "Traditional Arabic", "Arabic Typesetting", "Segoe UI" }
+        .First(f => new InstalledFontCollection().Families.Any(x => x.Name == f));
+}
+
+public class NamesForm : Form
+{
+    readonly List<Tile> tiles = [];
+    Name99 selected;
+
+    public NamesForm()
+    {
+        Theme.Apply(this);
+        Text = L.T("Names99");
+        StartPosition = FormStartPosition.CenterScreen;
+        ClientSize = new Size(Theme.Dp(720), Theme.Dp(660));
+        Padding = new Padding(Theme.Dp(12));
+        var today = Name99.OfDay(DateOnly.FromDateTime(DateTime.Today));
+        selected = today;
+
+        var search = new TextBox
+        {
+            Dock = DockStyle.Top, PlaceholderText = L.T("Search"), BackColor = Theme.Card, ForeColor = Theme.Text,
+            BorderStyle = BorderStyle.FixedSingle, Font = Theme.UI(11f),
+        };
+        var detail = new DetailPanel(this) { Dock = DockStyle.Bottom, Height = Theme.Dp(130) };
+        var grid = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(0, Theme.Dp(8), 0, Theme.Dp(8)) };
+        grid.HandleCreated += (_, _) => Theme.DarkScrollbars(grid);
+        foreach (var n in Name99.All.Value)
+        {
+            var t = new Tile(n, n == today) { Selected = n == selected };
+            t.Click += (_, _) =>
+            {
+                selected = n;
+                tiles.ForEach(x => { x.Selected = x.Item == n; x.Invalidate(); });
+                detail.Invalidate();
+            };
+            tiles.Add(t);
+        }
+        grid.Controls.AddRange([.. tiles]);
+        Controls.AddRange([grid, detail, search]);
+
+        search.TextChanged += (_, _) =>
+        {
+            var q = Data.Fold(search.Text.Trim());
+            grid.SuspendLayout();
+            foreach (var t in tiles)
+                t.Visible = q == "" || t.Item.N.ToString() == q || t.Item.Ar.Contains(search.Text.Trim())
+                    || new[] { t.Item.Kk, t.Item.Ru, t.Item.En, t.Item.Mkk, t.Item.Mru, t.Item.Men }.Any(x => Data.Fold(x).Contains(q));
+            grid.ResumeLayout();
+        };
+        Shown += (_, _) => grid.ScrollControlIntoView(tiles[today.N - 1]);
+    }
+
+    class Tile : Control
+    {
+        public readonly Name99 Item;
+        readonly bool isToday;
+        public bool Selected;
+
+        public Tile(Name99 n, bool today)
+        {
+            (Item, isToday) = (n, today);
+            Size = new Size(Theme.Dp(160), Theme.Dp(104));
+            Margin = new Padding(Theme.Dp(4));
+            Cursor = Cursors.Hand;
+            DoubleBuffered = true;
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(Theme.Bg);
+            var r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
+            using var path = Theme.RoundRect(r, Theme.Dp(8));
+            using (var b = new SolidBrush(Selected ? Theme.Line : Theme.Card)) g.FillPath(b, path);
+            if (isToday || Selected)
+                using (var p = new Pen(isToday ? Gold : Theme.Accent, Theme.Dp(1))) g.DrawPath(p, path);
+            using var small = Theme.UI(8.5f);
+            using var ar = new Font(Name99.ArabicFont, 17f);
+            using var tr = Theme.UI(9.5f, FontStyle.Bold);
+            var label = isToday ? $"{Item.N} · {L.T("Today")}" : Item.N.ToString();
+            TextRenderer.DrawText(g, label, small, new Point(Theme.Dp(8), Theme.Dp(5)), isToday ? Gold : Theme.Muted);
+            TextRenderer.DrawText(g, Item.Ar, ar, new Rectangle(0, Theme.Dp(16), Width, Theme.Dp(40)), Theme.Text,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.RightToLeft);
+            TextRenderer.DrawText(g, Item.Translit, tr, new Rectangle(Theme.Dp(4), Theme.Dp(56), Width - Theme.Dp(8), Theme.Dp(20)), Theme.Text,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, Item.Meaning, small, new Rectangle(Theme.Dp(4), Theme.Dp(78), Width - Theme.Dp(8), Theme.Dp(20)), Theme.Muted,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.EndEllipsis);
+        }
+    }
+
+    class DetailPanel(NamesForm owner) : Control
+    {
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.Clear(Theme.Bg);
+            var n = owner.selected;
+            var r = new RectangleF(0.5f, Theme.Dp(6), Width - 1.5f, Height - Theme.Dp(6) - 1);
+            using var path = Theme.RoundRect(r, Theme.Dp(10));
+            using (var b = new SolidBrush(Theme.Card)) g.FillPath(b, path);
+            using (var p = new Pen(Color.FromArgb(110, Gold), Theme.Dp(1))) g.DrawPath(p, path);
+            using var ar = new Font(Name99.ArabicFont, 30f);
+            using var tr = Theme.UI(14f, FontStyle.Bold);
+            using var mean = Theme.UI(11f);
+            using var small = Theme.UI(9f);
+            var arW = Theme.Dp(240);
+            TextRenderer.DrawText(g, n.Ar, ar, new Rectangle(Width - arW - Theme.Dp(12), (int)r.Y, arW, (int)r.Height), Theme.Text,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.RightToLeft);
+            int x = Theme.Dp(18), w = Width - arW - Theme.Dp(36);
+            TextRenderer.DrawText(g, $"{n.N} / 99", small, new Point(x, (int)r.Y + Theme.Dp(12)), Gold);
+            TextRenderer.DrawText(g, n.Translit, tr, new Rectangle(x, (int)r.Y + Theme.Dp(30), w, Theme.Dp(30)), Theme.Text, TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, n.Meaning, mean, new Rectangle(x, (int)r.Y + Theme.Dp(62), w, Theme.Dp(50)), Theme.Muted, TextFormatFlags.WordBreak);
+        }
+    }
+
+    public static readonly Color Gold = Color.FromArgb(230, 190, 110);
+}

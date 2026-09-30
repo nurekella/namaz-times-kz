@@ -19,6 +19,7 @@
   <ItemGroup>
     <EmbeddedResource Include="app.ico" LogicalName="app.ico" />
     <EmbeddedResource Include="cities.json" LogicalName="cities.json" />
+    <EmbeddedResource Include="names99.json" LogicalName="names99.json" />
     <!-- CI passes -p:GitHubRepo=owner/name so the app can check Releases for updates. -->
     <AssemblyMetadata Include="GitHubRepo" Value="$(GitHubRepo)" Condition="'$(GitHubRepo)' != ''" />
   </ItemGroup>

@@ -10,7 +10,7 @@ public class Widget : Form
     readonly Settings s;
     readonly NotifyIcon tray;
     readonly System.Windows.Forms.Timer timer = new() { Interval = 1000 };
-    readonly ToolStripMenuItem showItem, monthItem, holidaysItem, muteItem, settingsItem, updateItem, exitItem;
+    readonly ToolStripMenuItem showItem, monthItem, holidaysItem, tasbihItem, namesItem, muteItem, settingsItem, updateItem, exitItem;
     readonly List<(RectangleF R, P P)> bells = [];
     DateTime lastTick = Clock(), lastUpdateCheck;
     DateOnly shownDate;
@@ -21,11 +21,15 @@ public class Widget : Form
     SettingsForm? settingsForm;
     MonthForm? monthForm;
     HolidaysForm? holidaysForm;
+    TasbihForm? tasbihForm;
+    NamesForm? namesForm;
+    RectangleF nameCard; // "name of the day" card, clickable
     bool full, hover;          // fullscreen mode; mouse over widget (shows window buttons)
     int hot = -1, fullZoom = 100;
     Rectangle normalBounds;
     readonly RectangleF[] captions = new RectangleF[3]; // minimize, fullscreen, close
-    readonly RectangleF[] tools = new RectangleF[2];    // settings, menu — always visible, top-left
+    readonly RectangleF[] tools = new RectangleF[4];    // settings, tasbih, 99 names, menu — always visible, top-left
+    static readonly string[] ToolTips = ["Settings", "Tasbih", "Names99", "Menu"];
     int hotTool = -1;
     readonly ToolTip tip = new();
 
@@ -48,12 +52,14 @@ public class Widget : Form
         showItem = Theme.MenuItem('', (_, _) => SetWidgetVisible(!Visible));
         monthItem = Theme.MenuItem('', (_, _) => Open(ref monthForm, () => new MonthForm(s)));
         holidaysItem = Theme.MenuItem('', (_, _) => Open(ref holidaysForm, () => new HolidaysForm(s)));
+        tasbihItem = Theme.MenuItem('', (_, _) => OpenTasbih()); // RadioBullet, a bead
+        namesItem = Theme.MenuItem('', (_, _) => OpenNames());   // Dictionary (book)
         muteItem = Theme.MenuItem('', (_, _) => { s.Muted = !s.Muted; Data.Save(s); Invalidate(); });
         settingsItem = Theme.MenuItem('', (_, _) => OpenSettings());
         updateItem = Theme.MenuItem('', (_, _) => Process.Start(new ProcessStartInfo(updateUrl!) { UseShellExecute = true }));
         updateItem.Visible = false;
         exitItem = Theme.MenuItem('', (_, _) => { tray!.Visible = false; Application.Exit(); });
-        menu.Items.AddRange([showItem, monthItem, holidaysItem, new ToolStripSeparator(), muteItem, settingsItem, updateItem,
+        menu.Items.AddRange([showItem, monthItem, holidaysItem, tasbihItem, namesItem, new ToolStripSeparator(), muteItem, settingsItem, updateItem,
             new ToolStripSeparator(), exitItem]);
         menu.Opening += (_, _) => { showItem.Checked = Visible; muteItem.Checked = s.Muted; };
         ContextMenuStrip = menu;
@@ -85,6 +91,8 @@ public class Widget : Form
         showItem.Text = L.T("ShowWidget");
         monthItem.Text = L.T("Month");
         holidaysItem.Text = L.T("Holidays");
+        tasbihItem.Text = L.T("Tasbih");
+        namesItem.Text = L.T("Names99");
         muteItem.Text = L.T("Mute");
         settingsItem.Text = L.T("Settings") + "…";
         exitItem.Text = L.T("Exit");
@@ -144,7 +152,8 @@ public class Widget : Form
     int HeaderLines => 3 + (holiday != null ? 1 : 0);
     int CardHeight => 6 + Math.Max(rows.Sum(r => r.H), 60) + 4 + (fast != null ? 38 : 0) + 38;
     const int TopStrip = 24; // free space above the header for the minimize/fullscreen/close buttons
-    int ContentHeight => TopStrip + 6 + HeaderLines * 19 + 8 + CardHeight + 12; // at 96 dpi, zoom 100
+    const int NameCardHeight = 100;
+    int ContentHeight => TopStrip + 6 + HeaderLines * 19 + 8 + CardHeight + (s.ShowNameOfDay ? 10 + NameCardHeight : 0) + 12; // at 96 dpi, zoom 100
     Size SizeFor() => new(Zi(BaseWidth), Zi(ContentHeight));
 
     void Relayout()
@@ -382,11 +391,31 @@ public class Widget : Form
         if (next is { } n) Bar(card.Bottom - Z(38), Green, L.Name(n.P), n.At - now);
         using (var border = new Pen(CardBorder, Math.Max(1, Z(1)))) g.DrawPath(border, cardPath);
 
-        // Settings and menu buttons: always visible in the top strip, so nobody has to guess the right-click.
+        // Name of the day: one of the 99 names, changes daily; click opens the full list.
+        nameCard = RectangleF.Empty;
+        if (s.ShowNameOfDay)
+        {
+            var nm = Name99.OfDay(DateOnly.FromDateTime(now));
+            nameCard = new RectangleF(card.X, card.Bottom + Z(10), card.Width, Z(NameCardHeight));
+            using var np = Theme.RoundRect(nameCard, Z(14));
+            using (var nf = new SolidBrush(CardFill)) g.FillPath(nf, np);
+            using (var nb = new Pen(Color.FromArgb(110, Gold), Math.Max(1, Z(1)))) g.DrawPath(nb, np);
+            using var arFont = new Font(Name99.ArabicFont, 17f * EZ / 100f);
+            TextRenderer.DrawText(g, $"{L.T("NameOfDay")} · {nm.N} / 99", small,
+                Rectangle.Round(new RectangleF(rx, nameCard.Y + Z(6), rr - rx, Z(18))), Gold, Left);
+            TextRenderer.DrawText(g, nm.Ar, arFont, Rectangle.Round(new RectangleF(rx, nameCard.Y + Z(22), rr - rx, Z(36))), Color.White,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.RightToLeft);
+            TextRenderer.DrawText(g, nm.Translit, name, Rectangle.Round(new RectangleF(rx, nameCard.Y + Z(56), rr - rx, Z(22))), Color.White,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, nm.Meaning, small, Rectangle.Round(new RectangleF(rx, nameCard.Y + Z(76), rr - rx, Z(18))), Grey,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        }
+
+        // Settings, tasbih, 99 names and menu buttons: always visible in the top strip, so nobody has to guess the right-click.
         using (var toolFont = new Font("Segoe MDL2 Assets", 9.5f * EZ / 100f))
         {
-            string[] toolGlyphs = ["", ""]; // Settings, More
-            for (int i = 0; i < 2; i++)
+            string[] toolGlyphs = ["", "", "", ""]; // Settings, RadioBullet (tasbih), Dictionary (99 names), More
+            for (int i = 0; i < tools.Length; i++)
             {
                 tools[i] = new RectangleF(ox + Z(8) + i * Z(28), oy + Z(2), Z(26), Z(24));
                 if (i == hotTool)
@@ -424,7 +453,9 @@ public class Widget : Form
         switch (Array.FindIndex(tools, r => r.Contains(e.Location)))
         {
             case 0: OpenSettings(); return;
-            case 1: ContextMenuStrip!.Show(this, Point.Round(new PointF(tools[1].Left, tools[1].Bottom))); return;
+            case 1: OpenTasbih(); return;
+            case 2: OpenNames(); return;
+            case 3: ContextMenuStrip!.Show(this, Point.Round(new PointF(tools[3].Left, tools[3].Bottom))); return;
         }
         switch (hover ? Array.FindIndex(captions, r => r.Contains(e.Location)) : -1)
         {
@@ -432,6 +463,7 @@ public class Widget : Form
             case 1: ToggleFull(); return;
             case 2: if (full) ToggleFull(); SetWidgetVisible(false); return;
         }
+        if (nameCard.Contains(e.Location)) { OpenNames(); return; }
         foreach (var (r, p) in bells)
             if (r.Contains(e.Location))
             {
@@ -456,10 +488,10 @@ public class Widget : Form
         {
             hotTool = t;
             Invalidate();
-            if (t >= 0) tip.Show(L.T(t == 0 ? "Settings" : "Menu"), this, Point.Round(new PointF(tools[t].Left, tools[t].Bottom + Z(4))), 2500);
+            if (t >= 0) tip.Show(L.T(ToolTips[t]), this, Point.Round(new PointF(tools[t].Left, tools[t].Bottom + Z(4))), 2500);
             else tip.Hide(this);
         }
-        Cursor = h >= 0 || t >= 0 || bells.Any(b => b.R.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
+        Cursor = h >= 0 || t >= 0 || nameCard.Contains(e.Location) || bells.Any(b => b.R.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
     }
 
     protected override void OnMouseLeave(EventArgs e)
@@ -523,6 +555,9 @@ public class Widget : Form
         form.TopMost = TopMost;
         form.Show();
     }
+
+    void OpenTasbih() => Open(ref tasbihForm, () => new TasbihForm(s));
+    void OpenNames() => Open(ref namesForm, () => new NamesForm());
 
     void OpenSettings()
     {

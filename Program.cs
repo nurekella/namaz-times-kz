@@ -14,6 +14,10 @@ public class Settings
     public string Lang { get; set; } = L.Default();
     public bool Hanafi { get; set; } = true;
     public bool Hour12 { get; set; }
+    public bool ShowNameOfDay { get; set; } = true;
+    public int TasbihTarget { get; set; } = 33;
+    public string TasbihDate { get; set; } = "";
+    public int[] TasbihCounts { get; set; } = [];
     public Dictionary<P, int> Offsets { get; set; } = [];
     public int HijriAdjust { get; set; }
     public HashSet<P> Hidden { get; set; } = [];

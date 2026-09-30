@@ -64,6 +64,8 @@ public class SettingsForm : Form
         Row(g3, L.T("Size"), zoom);
         var opacity = new Stepper(s.Opacity, 30, 100, 10, v => v + "%");
         Row(g3, L.T("Opacity"), opacity);
+        var nameOfDay = new Toggle(s.ShowNameOfDay);
+        Row(g3, L.T("ShowNameOfDay"), nameOfDay);
         var topMost = new Toggle(s.TopMost);
         Row(g3, L.T("TopMost"), topMost);
         var autoStart = new Toggle(Widget.AutoStart);
@@ -125,6 +127,7 @@ public class SettingsForm : Form
             s.Zoom = zoom.Value;
             s.Opacity = opacity.Value;
             s.TopMost = topMost.Checked;
+            s.ShowNameOfDay = nameOfDay.Checked;
             s.Hidden = rows.Where(r => !r.show.Checked).Select(r => r.p).ToHashSet();
             s.Alerts = rows.Where(r => r.notify.Checked).Select(r => r.p).ToHashSet();
             s.Offsets = rows.Where(r => r.off.Value != 0).ToDictionary(r => r.p, r => r.off.Value);

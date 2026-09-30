@@ -266,6 +266,7 @@ public class Stepper : FlowLayoutPanel
 public class Segmented : FlowLayoutPanel
 {
     readonly List<RadioButton> items = [];
+    public event Action<int>? Changed;
 
     public Segmented(IEnumerable<string> options, int selected)
     {
@@ -281,7 +282,7 @@ public class Segmented : FlowLayoutPanel
             rb.FlatAppearance.BorderColor = Theme.Line;
             rb.FlatAppearance.CheckedBackColor = Theme.Accent;
             rb.FlatAppearance.MouseOverBackColor = Theme.Line;
-            rb.CheckedChanged += (_, _) => Style(rb);
+            rb.CheckedChanged += (_, _) => { Style(rb); if (rb.Checked) Changed?.Invoke(items.IndexOf(rb)); };
             items.Add(rb);
             Controls.Add(rb);
         }
