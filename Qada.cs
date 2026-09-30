@@ -22,11 +22,10 @@ public class QadaForm : Form
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
-        // Counters
-        var list = Theme.Section(L.T("Qada"), out var g, 4);
-        foreach (var key in Keys)
+        // Counters: one row = name, count, "made up" (−1), "+" (+1)
+        void AddRow(TableLayoutPanel g, string key, string label)
         {
-            var name = Theme.Label(key == "Witr" ? L.T("Witr") : L.Name(Enum.Parse<P>(key)), Theme.Text, 11f);
+            var name = Theme.Label(label, Theme.Text, 11f);
             name.Margin = new Padding(0, Theme.Dp(10), Theme.Dp(24), Theme.Dp(10));
             var count = new Label
             {
@@ -43,6 +42,8 @@ public class QadaForm : Form
             add.Click += (_, _) => Change(key, +1);
             g.Controls.AddRange([name, count, madeUp, add]);
         }
+        var list = Theme.Section(L.T("Qada"), out var g, 4);
+        foreach (var key in Keys) AddRow(g, key, key == "Witr" ? L.T("Witr") : L.Name(Enum.Parse<P>(key)));
         total = Theme.Label("", Theme.Accent, 11.5f, FontStyle.Bold);
         total.Margin = new Padding(0, Theme.Dp(12), 0, Theme.Dp(2));
         g.Controls.Add(total);
@@ -73,7 +74,10 @@ public class QadaForm : Form
         hint.Margin = new Padding(0, Theme.Dp(4), 0, 0);
 
         var root = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Padding = new Padding(Theme.Dp(16)) };
-        root.Controls.AddRange([list, bulk, hint]);
+        // Missed fasting days are counted separately: one day made up for each day missed.
+        var fasting = Theme.Section(L.T("QadaFast"), out var fg, 4);
+        AddRow(fg, "Fast", L.T("QadaFastDays"));
+        root.Controls.AddRange([list, bulk, fasting, hint]);
         Controls.Add(root);
         UpdateCounts();
     }

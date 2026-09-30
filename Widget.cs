@@ -35,8 +35,8 @@ public class Widget : Form
     int hot = -1, fullZoom = 100;
     Rectangle normalBounds;
     readonly RectangleF[] captions = new RectangleF[3]; // minimize, fullscreen, close
-    readonly RectangleF[] tools = new RectangleF[6];    // settings, tasbih, 99 names, prayer types, qada, menu — always visible, top-left
-    static readonly string[] ToolTips = ["Settings", "Tasbih", "Names99", "PrayerTypes", "Qada", "Menu"];
+    readonly RectangleF[] tools = new RectangleF[2];    // settings, menu — always visible, top-left
+    static readonly string[] ToolTips = ["Settings", "Menu"];
     int hotTool = -1;
     readonly ToolTip tip = new();
 
@@ -526,7 +526,7 @@ public class Widget : Form
         // Settings, tasbih, 99 names and menu buttons: always visible in the top strip, so nobody has to guess the right-click.
         using (var toolFont = new Font("Segoe MDL2 Assets", 9.5f * EZ / 100f))
         {
-            string[] toolGlyphs = ["", "", "", "", "", ""]; // Settings, RadioBullet (tasbih), Dictionary (99 names), ReadingMode (prayer types), History (qada), More
+            string[] toolGlyphs = ["", ""]; // Settings, More — everything else lives in the ⋯ menu so the strip never overflows
             for (int i = 0; i < tools.Length; i++)
             {
                 tools[i] = new RectangleF(ox + Z(6) + i * Z(26), oy + Z(2), Z(25), Z(24));
@@ -565,11 +565,7 @@ public class Widget : Form
         switch (Array.FindIndex(tools, r => r.Contains(e.Location)))
         {
             case 0: OpenSettings(); return;
-            case 1: OpenTasbih(); return;
-            case 2: OpenNames(); return;
-            case 3: OpenTypes(); return;
-            case 4: OpenQada(); return;
-            case 5: ContextMenuStrip!.Show(this, Point.Round(new PointF(tools[5].Left, tools[5].Bottom))); return;
+            case 1: ContextMenuStrip!.Show(this, Point.Round(new PointF(tools[1].Left, tools[1].Bottom))); return;
         }
         switch (hover ? Array.FindIndex(captions, r => r.Contains(e.Location)) : -1)
         {
