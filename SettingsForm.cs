@@ -7,6 +7,10 @@ public class SettingsForm : Form
         Theme.Apply(this);
         Text = "Namaz Times KZ — " + L.T("Settings");
         StartPosition = FormStartPosition.CenterScreen;
+        FormBorderStyle = FormBorderStyle.FixedSingle;
+        MaximizeBox = false;
+        AutoSize = true;
+        AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
         static void Row(TableLayoutPanel g, string label, Control c)
         {
@@ -97,11 +101,7 @@ public class SettingsForm : Form
         var root = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Padding = new Padding(Theme.Dp(16)) };
         root.Controls.Add(left); root.Controls.Add(right);
         root.Controls.Add(version); root.Controls.Add(buttons);
-        root.Anchor = AnchorStyles.None; // centred when the window is maximized
-        var host = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 1, AutoScroll = true };
-        host.Controls.Add(root);
-        Controls.Add(host);
-        ClientSize = root.GetPreferredSize(Size.Empty);
+        Controls.Add(root);
 
         // Shown modeless, so DialogResult alone doesn't close the window.
         cancel.Click += (_, _) => Close();

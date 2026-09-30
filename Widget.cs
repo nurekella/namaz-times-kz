@@ -21,6 +21,10 @@ public class Widget : Form
     SettingsForm? settingsForm;
     MonthForm? monthForm;
     HolidaysForm? holidaysForm;
+    bool full, hover;          // fullscreen mode; mouse over widget (shows window buttons)
+    int hot = -1, fullZoom = 100;
+    Rectangle normalBounds;
+    readonly RectangleF[] captions = new RectangleF[3]; // minimize, fullscreen, close
 
     const int BaseWidth = 250;
 
@@ -28,12 +32,13 @@ public class Widget : Form
     {
         s = settings;
         FormBorderStyle = FormBorderStyle.None;
-        ShowInTaskbar = false;
+        ShowInTaskbar = true; // so "minimize" has somewhere to go
+        KeyPreview = true;
         StartPosition = FormStartPosition.Manual;
         DoubleBuffered = true;
         BackColor = Theme.Bg;
         Text = "Namaz Times KZ";
-        Icon = Theme.AppIcon(SystemInformation.SmallIconSize);
+        Icon = Theme.AppIcon();
 
         var menu = new ContextMenuStrip();
         showItem = new ToolStripMenuItem("", null, (_, _) => SetWidgetVisible(!Visible));
@@ -48,8 +53,13 @@ public class Widget : Form
         menu.Opening += (_, _) => { showItem.Checked = Visible; muteItem.Checked = s.Muted; };
         ContextMenuStrip = menu;
 
-        tray = new NotifyIcon { Icon = Icon, Text = Text, ContextMenuStrip = menu, Visible = true };
-        tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) SetWidgetVisible(!Visible); };
+        tray = new NotifyIcon { Icon = Theme.AppIcon(SystemInformation.SmallIconSize), Text = Text, ContextMenuStrip = menu, Visible = true };
+        tray.MouseClick += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Left) return;
+            if (WindowState == FormWindowState.Minimized) { WindowState = FormWindowState.Normal; Activate(); }
+            else SetWidgetVisible(!Visible);
+        };
 
         ApplySettings();
         timer.Tick += (_, _) => Tick();
@@ -58,9 +68,10 @@ public class Widget : Form
 
     Day? Get(DateOnly d) => Data.GetDay(s.City, d);
     bool IsShown(P p) => !s.Hidden.Contains(p);
-    float Z(float v) => v * DeviceDpi / 96f * s.Zoom / 100f;
+    int EZ => full ? fullZoom : s.Zoom;
+    float Z(float v) => v * DeviceDpi / 96f * EZ / 100f;
     int Zi(float v) => (int)Math.Round(Z(v));
-    Font F(float pt, FontStyle st = FontStyle.Regular) => new(st == FontStyle.Bold ? "Segoe UI Semibold" : "Segoe UI", pt * s.Zoom / 100f);
+    Font F(float pt, FontStyle st = FontStyle.Regular) => new(st == FontStyle.Bold ? "Segoe UI Semibold" : "Segoe UI", pt * EZ / 100f);
 
     public void ApplySettings()
     {
@@ -79,18 +90,40 @@ public class Widget : Form
 
     int HeaderLines => 3 + (holiday != null ? 1 : 0);
     int Rows => Enum.GetValues<P>().Count(IsShown);
-    Size SizeFor() => new(Zi(BaseWidth), Zi(52 + HeaderLines * 18 + 10 + Math.Max(Rows, 2) * 26 + 8));
+    int ContentHeight => 52 + HeaderLines * 18 + 10 + Math.Max(Rows, 2) * 26 + 8; // at 96 dpi, zoom 100
+    Size SizeFor() => new(Zi(BaseWidth), Zi(ContentHeight));
 
     void Relayout()
     {
-        ClientSize = SizeFor();
+        if (full)
+        {
+            var screen = Screen.FromRectangle(normalBounds).Bounds;
+            fullZoom = Math.Clamp((int)(screen.Height * 0.9 / (ContentHeight * DeviceDpi / 96f) * 100), 100, 800);
+            Bounds = screen;
+        }
+        else ClientSize = SizeFor();
         Invalidate();
+    }
+
+    void ToggleFull()
+    {
+        if (!full) { normalBounds = Bounds; full = true; }
+        else { full = false; Bounds = normalBounds; }
+        Relayout();
+        Activate();
+    }
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.KeyCode == Keys.Escape && full) ToggleFull();
+        if (e.KeyCode == Keys.F11) ToggleFull();
     }
 
     protected override void OnSizeChanged(EventArgs e)
     {
         base.OnSizeChanged(e);
-        Region = Region.FromHrgn(CreateRoundRectRgn(0, 0, Width + 1, Height + 1, Zi(14), Zi(14)));
+        Region = full ? null : Region.FromHrgn(CreateRoundRectRgn(0, 0, Width + 1, Height + 1, Zi(14), Zi(14)));
     }
 
     protected override void SetVisibleCore(bool value) => base.SetVisibleCore(value && s.WidgetVisible);
@@ -182,21 +215,23 @@ public class Widget : Form
         using var bold = F(10f, FontStyle.Bold);
         using var clock = F(20f, FontStyle.Bold);
         using var countdown = F(11f, FontStyle.Bold);
-        using var icons = new Font("Segoe MDL2 Assets", 9f * s.Zoom / 100f);
-        int pad = Zi(14), w = ClientSize.Width;
+        using var icons = new Font("Segoe MDL2 Assets", 9f * EZ / 100f);
+        // Content is BaseWidth wide; in fullscreen it is scaled up and centred on the screen.
+        int cw = Zi(BaseWidth), ox = (ClientSize.Width - cw) / 2, oy = full ? (ClientSize.Height - Zi(ContentHeight)) / 2 : 0;
+        int left = ox + Zi(14), right = ox + cw - Zi(14);
         var now = DateTime.Now;
 
-        TextRenderer.DrawText(g, now.ToString("HH:mm"), clock, new Point(pad - Zi(2), Zi(6)), Theme.Text);
+        TextRenderer.DrawText(g, now.ToString("HH:mm"), clock, new Point(left - Zi(2), oy + Zi(6)), Theme.Text);
         if (next is { } n)
         {
-            TextRenderer.DrawText(g, L.Name(n.P), small, new Rectangle(0, Zi(10), w - pad, Zi(18)), Theme.Muted, TextFormatFlags.Right);
-            TextRenderer.DrawText(g, "−" + Fmt(n.At - now), countdown, new Rectangle(0, Zi(26), w - pad, Zi(22)), Theme.Accent, TextFormatFlags.Right);
+            TextRenderer.DrawText(g, L.Name(n.P), small, new Rectangle(ox, oy + Zi(10), right - ox, Zi(18)), Theme.Muted, TextFormatFlags.Right);
+            TextRenderer.DrawText(g, "−" + Fmt(n.At - now), countdown, new Rectangle(ox, oy + Zi(26), right - ox, Zi(22)), Theme.Accent, TextFormatFlags.Right);
         }
 
-        float y = Z(52);
+        float y = oy + Z(52);
         void Line(string text, Color c)
         {
-            TextRenderer.DrawText(g, text, small, new Rectangle(pad, (int)y, w - 2 * pad, Zi(18)), c, TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, text, small, new Rectangle(left, (int)y, right - left, Zi(18)), c, TextFormatFlags.EndEllipsis);
             y += Z(18);
         }
         var greg = now.ToString("dddd, d MMMM yyyy", L.Culture);
@@ -206,41 +241,54 @@ public class Widget : Form
         if (holiday != null) Line("✦ " + L.T(holiday.Key), Theme.Accent);
 
         y += Z(4);
-        using (var pen = new Pen(Theme.Line, Math.Max(1, Z(1)))) g.DrawLine(pen, pad, y, w - pad, y);
+        using (var pen = new Pen(Theme.Line, Math.Max(1, Z(1)))) g.DrawLine(pen, left, y, right, y);
         y += Z(6);
 
         bells.Clear();
         if (today == null)
-        {
-            TextRenderer.DrawText(g, L.T("NoData"), normal, new Point(pad, (int)y), Theme.Text);
-            return;
-        }
+            TextRenderer.DrawText(g, L.T("NoData"), normal, new Point(left, (int)y), Theme.Text);
         var rowH = Z(26);
         var bellW = Z(22);
-        foreach (var (p, t) in today.Where(x => IsShown(x.P)))
+        foreach (var (p, t) in (today ?? []).Where(x => IsShown(x.P)))
         {
             var isNext = next is { } nn && nn.P == p && nn.At == t;
             if (isNext)
             {
                 using var b = new SolidBrush(Color.FromArgb(40, Theme.Accent));
-                using var path = Theme.RoundRect(new RectangleF(Z(6), y - Z(2), w - Z(12), rowH - Z(2)), Z(6));
+                using var path = Theme.RoundRect(new RectangleF(ox + Z(6), y - Z(2), cw - Z(12), rowH - Z(2)), Z(6));
                 g.FillPath(b, path);
             }
             var main = p is P.Fajr or P.Dhuhr or P.Asr or P.Maghrib or P.Isha;
             var color = isNext ? Theme.Accent : main ? Theme.Text : Theme.Muted;
             var font = isNext ? bold : normal;
-            var row = new Rectangle(pad, (int)y, w - 2 * pad, (int)rowH);
+            var row = new Rectangle(left, (int)y, right - left, (int)rowH);
             TextRenderer.DrawText(g, L.Name(p), font, row, color, TextFormatFlags.VerticalCenter);
             TextRenderer.DrawText(g, t.ToString("HH:mm"), font, new Rectangle(row.X, row.Y, (int)(row.Width - bellW), row.Height), color,
                 TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
 
             // Bell: click toggles this prayer's notification.
             var on = s.Alerts.Contains(p);
-            var bell = new RectangleF(w - pad - bellW + Z(4), y, bellW, rowH);
+            var bell = new RectangleF(right - bellW + Z(4), y, bellW, rowH);
             TextRenderer.DrawText(g, on ? "" : "", icons, Rectangle.Round(bell), // Ringer / RingerSilent
                 on && !s.Muted ? Theme.Accent : Color.FromArgb(110, Theme.Muted), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             bells.Add((bell, p));
             y += rowH;
+        }
+
+        // Window buttons (minimize / fullscreen / close) appear while the mouse is over the widget.
+        var bw = full ? Theme.Dp(46) : Z(26);
+        var bh = full ? Theme.Dp(32) : Z(24);
+        for (int i = 0; i < 3; i++) captions[i] = new RectangleF(ClientSize.Width - (3 - i) * bw, 0, bw, bh);
+        if (!hover) return;
+        using var capFont = new Font("Segoe MDL2 Assets", full ? 8f : 7f * EZ / 100f);
+        using (var bg = new SolidBrush(Theme.Bg)) g.FillRectangle(bg, captions[0].X, 0, 3 * bw, bh);
+        string[] glyphs = ["", full ? "" : "", ""]; // ChromeMinimize, ChromeRestore/Maximize, ChromeClose
+        for (int i = 0; i < 3; i++)
+        {
+            if (i == hot)
+                using (var hb = new SolidBrush(i == 2 ? Color.FromArgb(196, 43, 28) : Theme.Line)) g.FillRectangle(hb, captions[i]);
+            TextRenderer.DrawText(g, glyphs[i], capFont, Rectangle.Round(captions[i]), i == hot ? Color.White : Theme.Muted,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         }
     }
 
@@ -248,6 +296,12 @@ public class Widget : Form
     {
         base.OnMouseDown(e);
         if (e.Button != MouseButtons.Left) return;
+        switch (hover ? Array.FindIndex(captions, r => r.Contains(e.Location)) : -1)
+        {
+            case 0: WindowState = FormWindowState.Minimized; return;
+            case 1: ToggleFull(); return;
+            case 2: if (full) ToggleFull(); SetWidgetVisible(false); return;
+        }
         foreach (var (r, p) in bells)
             if (r.Contains(e.Location))
             {
@@ -256,6 +310,7 @@ public class Widget : Form
                 Invalidate();
                 return;
             }
+        if (full) return;
         // Drag the borderless window by any other point.
         ReleaseCapture();
         SendMessage(Handle, 0xA1 /*WM_NCLBUTTONDOWN*/, 2 /*HTCAPTION*/, 0);
@@ -264,13 +319,22 @@ public class Widget : Form
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        Cursor = bells.Any(b => b.R.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
+        var h = Array.FindIndex(captions, r => r.Contains(e.Location));
+        if (!hover || h != hot) { hover = true; hot = h; Invalidate(); }
+        Cursor = h >= 0 || bells.Any(b => b.R.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        base.OnMouseLeave(e);
+        hover = false; hot = -1;
+        Invalidate();
     }
 
     protected override void OnMouseWheel(MouseEventArgs e)
     {
         base.OnMouseWheel(e);
-        if ((ModifierKeys & Keys.Control) == 0) return;
+        if ((ModifierKeys & Keys.Control) == 0 || full) return;
         s.Zoom = Math.Clamp(s.Zoom + Math.Sign(e.Delta) * 10, 70, 250);
         Data.Save(s);
         Relayout();
@@ -281,7 +345,7 @@ public class Widget : Form
     {
         const int WM_NCHITTEST = 0x84, WM_SIZING = 0x214, WM_EXITSIZEMOVE = 0x232, HTBOTTOMRIGHT = 17;
         base.WndProc(ref m);
-        if (m.Msg == WM_NCHITTEST)
+        if (m.Msg == WM_NCHITTEST && !full)
         {
             var p = PointToClient(new Point((short)(m.LParam.ToInt64() & 0xFFFF), (short)((m.LParam.ToInt64() >> 16) & 0xFFFF)));
             if (p.X > Width - Zi(18) && p.Y > Height - Zi(18)) m.Result = HTBOTTOMRIGHT;
@@ -302,7 +366,7 @@ public class Widget : Form
     protected override void OnMove(EventArgs e)
     {
         base.OnMove(e);
-        if (!IsHandleCreated || !Visible) return;
+        if (!IsHandleCreated || !Visible || full || WindowState != FormWindowState.Normal) return;
         s.X = Left; s.Y = Top; Data.Save(s);
     }
 
