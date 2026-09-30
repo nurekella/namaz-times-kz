@@ -315,7 +315,7 @@ public class Widget : Form
         float left = ox + Z(14), right = ox + cw - Z(14);
 
         // Header: clock on the left; location, dates and holiday right-aligned.
-        TextRenderer.DrawText(g, L.Time(now), clock, new Point((int)left - Zi(2), oy + Zi(TopStrip + 2)), Color.White);
+        TextRenderer.DrawText(g, L.Time(now), clock, new Point((int)left - Zi(2), oy + Zi(TopStrip + 9)), Color.White);
         float y = oy + Z(TopStrip + 6);
         var city = s.City.Title + (s.Muted ? " 🔕" : "");
         var cityW = TextRenderer.MeasureText(g, city, head, Size.Empty, TextFormatFlags.NoPadding).Width;
