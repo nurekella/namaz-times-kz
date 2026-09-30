@@ -247,7 +247,8 @@ public class Widget : Form
         var now = Clock();
         var date = DateOnly.FromDateTime(now);
         today = Data.Times(date, Get, s);
-        next = Data.Next(now, Get, IsShown, s);
+        // "Next" = the next main time; Tahajjud and Duha are voluntary extras, not the next prayer.
+        next = Data.Next(now, Get, p => IsShown(p) && p is not (P.Tahajjud or P.Duha), s);
         var height = ContentHeight;
         if (date != shownDate)
         {
@@ -469,10 +470,8 @@ public class Widget : Form
             // Speaker: click toggles this prayer's notification.
             var on = s.Alerts.Contains(r.P);
             var icon = new RectangleF(box.X - Z(30), ry, Z(24), h);
-            // Centre the ink, not the glyph box: measured ink centre is 0.05 em (Volume3) and 0.36 em (Volume0) left of the box centre.
-            var em = icons.SizeInPoints * DeviceDpi / 72f;
-            var inked = icon; inked.Offset((on ? 0.05f : 0.362f) * em, 0);
-            TextRenderer.DrawText(g, on ? "" : "", icons, Rectangle.Round(inked), // Volume3 / Volume0
+            // Volume3 vs Mute: both start at the same x and are nearly the same width, so the column lines up.
+            TextRenderer.DrawText(g, on ? "" : "", icons, Rectangle.Round(icon),
                 on && !s.Muted ? Color.FromArgb(205, 208, 214) : Speaker, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             bells.Add((icon, r.P));
             ry += h;
