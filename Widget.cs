@@ -12,7 +12,7 @@ public class Widget : Form
     readonly System.Windows.Forms.Timer timer = new() { Interval = 1000 };
     readonly ToolStripMenuItem showItem, monthItem, holidaysItem, muteItem, settingsItem, updateItem, exitItem;
     readonly List<(RectangleF R, P P)> bells = [];
-    DateTime lastTick = DateTime.Now, lastUpdateCheck;
+    DateTime lastTick = Clock(), lastUpdateCheck;
     DateOnly shownDate;
     List<(P P, DateTime At)>? today;
     (P P, DateTime At)? next;
@@ -90,13 +90,20 @@ public class Widget : Form
         if (IsHandleCreated) Relayout();
     }
 
-    /// One line of the prayer card; Sunrise carries Duha as a sub-line like the KZ mobile apps.
-    record Row(P P, DateTime At, DateTime? Duha)
+    /// One line of the prayer card with an optional grey sub-line: "Духа 08:43" under Sunrise,
+    /// and in Ramadan "Сәресі" under Fajr and "Ауызашар" under Maghrib.
+    record Row(P P, DateTime At, string? Sub)
     {
-        public int H => Duha == null ? 34 : 48;
+        public int H => Sub == null ? 34 : 48;
     }
     List<Row> rows = [];
     P? current;
+    (string Label, DateTime At)? fast; // Ramadan countdown: to end of suhoor or to iftar
+
+    /// Test seam: lets offscreen renders show a Ramadan day.
+    internal static Func<DateTime> Clock = () => DateTime.Now;
+
+    bool IsRamadan(DateTime now) => Hijri.Of(DateOnly.FromDateTime(now), s.HijriAdjust).M == 9;
 
     static DateTime? Find(List<(P P, DateTime At)>? l, P p) => l?.Where(x => x.P == p).Select(x => (DateTime?)x.At).FirstOrDefault();
 
@@ -104,22 +111,34 @@ public class Widget : Form
     {
         rows = [];
         current = null;
+        fast = null;
         if (today == null) return;
-        void Add(P p, DateTime? t, DateTime? duha = null) { if (t is { } v && IsShown(p)) rows.Add(new(p, v, duha)); }
-        var duhaSub = IsShown(P.Sunrise) && IsShown(P.Duha);
-        Add(P.Fajr, Find(today, P.Fajr));
-        Add(P.Sunrise, Find(today, P.Sunrise), duhaSub ? Find(today, P.Duha) : null);
+        var ramadan = IsRamadan(now);
+        void Add(P p, DateTime? t, string? sub = null) { if (t is { } v && IsShown(p)) rows.Add(new(p, v, sub)); }
+        var duhaSub = IsShown(P.Sunrise) && IsShown(P.Duha) && Find(today, P.Duha) is { } duha ? $"{L.Name(P.Duha)} {duha:HH:mm}" : null;
+        Add(P.Fajr, Find(today, P.Fajr), ramadan ? L.T("Suhoor") : null);
+        Add(P.Sunrise, Find(today, P.Sunrise), duhaSub);
         if (!IsShown(P.Sunrise)) Add(P.Duha, Find(today, P.Duha));
-        foreach (var p in new[] { P.Dhuhr, P.Asr, P.Maghrib, P.Isha }) Add(p, Find(today, p));
+        Add(P.Dhuhr, Find(today, P.Dhuhr));
+        Add(P.Asr, Find(today, P.Asr));
+        Add(P.Maghrib, Find(today, P.Maghrib), ramadan ? L.T("Iftar") : null);
+        Add(P.Isha, Find(today, P.Isha));
         // Tahajjud goes last: tonight's, unless we are still in the night before today's Fajr.
         var tomorrow = Data.Times(DateOnly.FromDateTime(now).AddDays(1), Get, s);
+        // Ramadan: suhoor ends at Fajr (Таң), iftar at Maghrib (Ақшам). After iftar, count down to
+        // tomorrow's suhoor if tomorrow is a fasting day (also covers the eve of the first fast).
+        if (Find(today, P.Fajr) is { } f && Find(today, P.Maghrib) is { } m)
+            fast = ramadan && now < f ? (L.T("UntilSuhoor"), f)
+                : ramadan && now < m ? (L.T("UntilIftar"), m)
+                : now >= m && IsRamadan(now.AddDays(1)) && Find(tomorrow, P.Fajr) is { } f2 ? (L.T("UntilSuhoor"), f2)
+                : null;
         Add(P.Tahajjud, now < Find(today, P.Fajr) ? Find(today, P.Tahajjud) : Find(tomorrow, P.Tahajjud));
         // Current period = last passed time today (Duha is a sub-line, not a period); before the first one it's still Isha.
         current = today.LastOrDefault(x => x.P != P.Duha && x.At <= now) is { At.Year: > 1 } c ? c.P : P.Isha;
     }
 
     int HeaderLines => 3 + (holiday != null ? 1 : 0);
-    int CardHeight => 6 + Math.Max(rows.Sum(r => r.H), 60) + 4 + 38;
+    int CardHeight => 6 + Math.Max(rows.Sum(r => r.H), 60) + 4 + (fast != null ? 38 : 0) + 38;
     const int TopStrip = 24; // free space above the header for the minimize/fullscreen/close buttons
     int ContentHeight => TopStrip + 6 + HeaderLines * 19 + 8 + CardHeight + 12; // at 96 dpi, zoom 100
     Size SizeFor() => new(Zi(BaseWidth), Zi(ContentHeight));
@@ -189,7 +208,7 @@ public class Widget : Form
 
     void Tick()
     {
-        var now = DateTime.Now;
+        var now = Clock();
         var date = DateOnly.FromDateTime(now);
         today = Data.Times(date, Get, s);
         next = Data.Next(now, Get, IsShown, s);
@@ -251,6 +270,7 @@ public class Widget : Form
     static readonly Color CardFill = Color.FromArgb(242, 44, 46, 54), CardBorder = Color.FromArgb(70, 255, 255, 255);
     static readonly Color Pill = Color.FromArgb(78, 80, 90), Green = Color.FromArgb(22, 163, 116);
     static readonly Color Grey = Color.FromArgb(142, 142, 147), Speaker = Color.FromArgb(128, 131, 138);
+    static readonly Color Gold = Color.FromArgb(230, 190, 110), GoldBar = Color.FromArgb(176, 128, 44); // Ramadan
 
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -262,7 +282,7 @@ public class Widget : Form
         using var time = F(12f, FontStyle.Bold);
         using var clock = F(14f, FontStyle.Bold);
         using var icons = new Font("Segoe MDL2 Assets", 10f * EZ / 100f);
-        var now = DateTime.Now;
+        var now = Clock();
         const TextFormatFlags Right = TextFormatFlags.Right | TextFormatFlags.VerticalCenter;
         const TextFormatFlags Left = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
 
@@ -314,10 +334,11 @@ public class Widget : Form
         foreach (var r in rows)
         {
             var h = Z(r.H);
-            if (r.Duha is { } duha)
+            if (r.Sub is { } sub)
             {
                 TextRenderer.DrawText(g, L.Name(r.P), name, Rectangle.Round(new RectangleF(rx, ry + Z(4), rr - rx, Z(24))), Color.White, Left);
-                TextRenderer.DrawText(g, $"{L.Name(P.Duha)} {duha:HH:mm}", small, Rectangle.Round(new RectangleF(rx, ry + Z(26), rr - rx, Z(18))), Grey, Left);
+                TextRenderer.DrawText(g, sub, small, Rectangle.Round(new RectangleF(rx, ry + Z(26), rr - rx, Z(18))),
+                    r.P == P.Sunrise ? Grey : Gold, Left);
             }
             else TextRenderer.DrawText(g, L.Name(r.P), name, Rectangle.Round(new RectangleF(rx, ry, rr - rx, h)), Color.White, Left);
 
@@ -342,16 +363,19 @@ public class Widget : Form
             ry += h;
         }
 
-        // Green bar: next prayer and countdown, clipped to the card's rounded bottom.
-        if (next is { } n)
+        // Bottom bars, clipped to the card's rounded bottom: Ramadan countdown (gold), then next prayer (green).
+        void Bar(float top, Color fillColor, string label, TimeSpan left)
         {
-            var bar = new RectangleF(card.X, card.Bottom - Z(38), card.Width, Z(38));
+            var bar = new RectangleF(card.X, top, card.Width, Z(38));
             g.SetClip(cardPath);
-            using (var gb = new SolidBrush(Green)) g.FillRectangle(gb, bar);
+            using (var gb = new SolidBrush(fillColor)) g.FillRectangle(gb, bar);
             g.ResetClip();
-            TextRenderer.DrawText(g, L.Name(n.P), name, Rectangle.Round(new RectangleF(rx, bar.Y, rr - rx, bar.Height)), Color.White, Left);
-            TextRenderer.DrawText(g, Fmt(n.At - now), time, Rectangle.Round(new RectangleF(rx, bar.Y, rr - rx, bar.Height)), Color.White, Right);
+            var timeW = TextRenderer.MeasureText(g, "00:00:00", time, Size.Empty, TextFormatFlags.NoPadding).Width + Z(8);
+            TextRenderer.DrawText(g, label, name, Rectangle.Round(new RectangleF(rx, bar.Y, rr - rx - timeW, bar.Height)), Color.White, Left);
+            TextRenderer.DrawText(g, Fmt(left), time, Rectangle.Round(new RectangleF(rx, bar.Y, rr - rx, bar.Height)), Color.White, Right);
         }
+        if (fast is { } f) Bar(card.Bottom - Z(76), GoldBar, f.Label, f.At - now);
+        if (next is { } n) Bar(card.Bottom - Z(38), Green, L.Name(n.P), n.At - now);
         using (var border = new Pen(CardBorder, Math.Max(1, Z(1)))) g.DrawPath(border, cardPath);
 
         // Window buttons (minimize / fullscreen / close) appear while the mouse is over the widget.
