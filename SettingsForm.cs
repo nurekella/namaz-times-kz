@@ -2,7 +2,7 @@ namespace NamazTimes;
 
 public class SettingsForm : Form
 {
-    public SettingsForm(Settings s)
+    public SettingsForm(Settings s, Action? testAlert = null)
     {
         Theme.Apply(this);
         Text = "Namaz Times KZ — " + L.T("Settings");
@@ -52,6 +52,9 @@ public class SettingsForm : Form
         var jumuahRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
         jumuahRow.Controls.AddRange([jumuah, jumuahMin]);
         Row(g2, L.T("JumuahRemind"), jumuahRow);
+        var test = Theme.Button(L.T("TestAlert"));
+        test.Click += (_, _) => testAlert?.Invoke();
+        g2.Controls.Add(test); g2.SetColumnSpan(test, 2);
 
         // Widget
         var widget = Theme.Section(L.T("Widget"), out var g3);

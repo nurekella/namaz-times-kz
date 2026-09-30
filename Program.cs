@@ -180,7 +180,10 @@ static class Program
         if (!first) return 0;
 
         ApplicationConfiguration.Initialize();
-        Application.Run(new Widget(Data.LoadSettings()));
+        var widget = new Widget(Data.LoadSettings());
+        if (args.Contains("--test-alert")) // show a sample notification shortly after start
+            widget.Load += async (_, _) => { await Task.Delay(1500); widget.TestAlert(); };
+        Application.Run(widget);
         return 0;
     }
 

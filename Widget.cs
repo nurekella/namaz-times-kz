@@ -177,7 +177,14 @@ public class Widget : Form
 
     void Notify(string title, string text)
     {
-        if (!s.Muted) tray.ShowBalloonTip(10000, title, text, ToolTipIcon.Info);
+        if (!s.Muted) tray.ShowBalloonTip(10000, title, text, ToolTipIcon.None);
+    }
+
+    /// Sample alert for the next prayer, exactly as a real one looks (ignores mute).
+    public void TestAlert()
+    {
+        var (p, t) = next ?? (P.Fajr, DateTime.Today.AddHours(5));
+        tray.ShowBalloonTip(10000, $"{L.Name(p)} — {t:HH:mm}", $"{L.T("PrayerTime")} · {s.City.Title}", ToolTipIcon.None);
     }
 
     void Tick()
@@ -232,7 +239,7 @@ public class Widget : Form
             updateUrl = u.Url;
             updateItem.Text = string.Format(L.T("Update"), "v" + u.Version.ToString(3));
             updateItem.Visible = true;
-            tray.ShowBalloonTip(10000, "Namaz Times KZ", string.Format(L.T("UpdateAvail"), "v" + u.Version.ToString(3)), ToolTipIcon.Info);
+            tray.ShowBalloonTip(10000, "Namaz Times KZ", string.Format(L.T("UpdateAvail"), "v" + u.Version.ToString(3)), ToolTipIcon.None);
         }
         catch { /* offline or rate-limited: try again tomorrow */ }
     }
@@ -314,16 +321,17 @@ public class Widget : Form
             }
             else TextRenderer.DrawText(g, L.Name(r.P), name, Rectangle.Round(new RectangleF(rx, ry, rr - rx, h)), Color.White, Left);
 
-            var t = r.At.ToString("HH:mm");
+            // Times sit centred in a fixed-width box at the right; the current one gets a pill of exactly that box.
+            var boxW = TextRenderer.MeasureText(g, "00:00", time, Size.Empty, TextFormatFlags.NoPadding).Width + Z(14);
+            var box = new RectangleF(rr - boxW + Z(6), ry + (h - Z(28)) / 2, boxW, Z(28));
             if (r.P == current)
             {
-                var tw = TextRenderer.MeasureText(g, t, time, Size.Empty, TextFormatFlags.NoPadding).Width;
-                var ph = Z(26);
-                using var pill = Theme.RoundRect(new RectangleF(rr - tw - Z(7), ry + (h - ph) / 2, tw + Z(12), ph), Z(6));
+                using var pill = Theme.RoundRect(box, Z(7));
                 using var pb = new SolidBrush(Pill);
                 g.FillPath(pb, pill);
             }
-            TextRenderer.DrawText(g, t, time, Rectangle.Round(new RectangleF(rx, ry, rr - rx, h)), Color.White, Right);
+            TextRenderer.DrawText(g, r.At.ToString("HH:mm"), time, Rectangle.Round(box), Color.White,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
 
             // Speaker: click toggles this prayer's notification.
             var on = s.Alerts.Contains(r.P);
@@ -460,7 +468,7 @@ public class Widget : Form
     void OpenSettings()
     {
         if (settingsForm is { IsDisposed: false }) { settingsForm.Activate(); return; }
-        settingsForm = new SettingsForm(s) { TopMost = TopMost };
+        settingsForm = new SettingsForm(s, TestAlert) { TopMost = TopMost };
         settingsForm.FormClosed += (_, _) =>
         {
             if (settingsForm.DialogResult != DialogResult.OK) return;

@@ -57,6 +57,7 @@ public static class L
         ["Notify"] = ("Хабар", "Уведомл.", "Notify"),
         ["Offset"] = ("Түзету, мин", "Поправка, мин", "Adjust, min"),
         ["Notifications"] = ("Хабарламалар", "Уведомления", "Notifications"),
+        ["TestAlert"] = ("Хабарламаны тексеру", "Проверить уведомление", "Test notification"),
         ["NotifyOn"] = ("Хабарламалар қосулы", "Уведомления включены", "Notifications on"),
         ["RemindBefore"] = ("Алдын ала еске салу", "Напомнить заранее", "Remind before"),
         ["JumuahRemind"] = ("Жұма күні бесін алдында еске салу", "Джума: напомнить в пятницу до Зухра", "Friday: remind before Dhuhr"),
