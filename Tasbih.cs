@@ -26,7 +26,7 @@ public class TasbihForm : Form
     static readonly int[] Targets = [Recommended, 33, 99, 100, 0]; // 0 = no limit
     readonly Settings s;
     readonly ListBox list;
-    readonly Label ar, translit, meaning, virtue, total;
+    readonly Label ar, translit, meaning, virtue, total, hint;
     readonly Ring ring;
     int idx, n;
 
@@ -80,8 +80,8 @@ public class TasbihForm : Form
         meaning = Block(Theme.UI(9.5f), Theme.Muted, 44);
         virtue = Block(Theme.UI(9f), NamesForm.Gold, 76);
         ring = new Ring(this) { Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(6), 0, Theme.Dp(2)) };
-        var hint = Block(Theme.UI(8.5f), Theme.Muted, 22);
-        hint.Text = L.T("TapOrSpace");
+        hint = Block(Theme.UI(8.5f), Theme.Muted, 26);
+
         var target = new Segmented(Targets.Select(t => t switch { Recommended => L.T("TargetRecommended"), 0 => "∞", _ => t.ToString() }),
             Math.Max(0, Array.IndexOf(Targets, s.TasbihTarget)));
         var reset = Theme.Button("↺");
@@ -98,8 +98,8 @@ public class TasbihForm : Form
         Controls.Add(root);
 
         list.SelectedIndexChanged += (_, _) => { idx = Math.Max(0, list.SelectedIndex); n = 0; UpdateView(); };
-        target.Changed += i => { s.TasbihTarget = Targets[i]; n = 0; Data.Save(s); ring.Invalidate(); };
-        reset.Click += (_, _) => { n = 0; ring.Invalidate(); };
+        target.Changed += i => { s.TasbihTarget = Targets[i]; n = 0; Data.Save(s); UpdateView(); };
+        reset.Click += (_, _) => { n = 0; UpdateView(); };
         list.SelectedIndex = 0;
     }
 
@@ -118,19 +118,35 @@ public class TasbihForm : Form
     {
         var d = Dhikr.All.Value[idx];
         ar.Text = d.Ar;
-        var oldFont = ar.Font; // long dhikrs get a smaller Arabic font so they fit in the fixed box
-        ar.Font = new Font(Name99.ArabicFont, (d.Ar.Length > 70 ? 15f : d.Ar.Length > 35 ? 18f : 24f) * Theme.UiScale);
-        oldFont.Dispose();
+        // long dhikrs get a smaller Arabic font so they fit in the fixed box
+        SetFont(ar, new Font(Name99.ArabicFont, (d.Ar.Length > 70 ? 15f : d.Ar.Length > 35 ? 18f : 24f) * Theme.UiScale));
         translit.Text = d.Translit;
-        var oldTr = translit.Font;
-        translit.Font = Theme.UI(d.Translit.Length > 80 ? 9.5f : d.Translit.Length > 40 ? 10.5f : 12f, FontStyle.Bold);
-        oldTr.Dispose();
+        SetFont(translit, Theme.UI(d.Translit.Length > 80 ? 9.5f : d.Translit.Length > 40 ? 10.5f : 12f, FontStyle.Bold));
         meaning.Text = d.Meaning;
         virtue.Text = $"{d.Virtue}\n{d.Source} · {string.Format(L.T("RecommendedTimes"), d.Recommended)}";
         total.Text = $"{L.T("TodayCap")}: {s.TasbihCounts.Sum()}";
+        // Goal reached: praise instead of the "click or Space" hint, until the next round starts.
+        hint.Text = Done ? praise : L.T("TapOrSpace");
+        hint.ForeColor = Done ? Theme.Accent : Theme.Muted;
+        SetFont(hint, Done ? Theme.UI(12f, FontStyle.Bold) : Theme.UI(8.5f));
         list.Invalidate();
         ring.Invalidate();
     }
+
+    /// Swap a label's font and free the old one. A font equal to the current one is ignored by the setter
+    /// (the label keeps the old object), so in that case the new one is freed instead — never the one in use.
+    static void SetFont(Label l, Font f)
+    {
+        if (l.Font.Equals(f)) { f.Dispose(); return; }
+        var old = l.Font;
+        l.Font = f;
+        old.Dispose();
+    }
+
+    bool Done => Target > 0 && n >= Target;
+
+    static readonly string[] PraiseKeys = ["Praise1", "Praise2", "Praise3"];
+    string praise = "";
 
     void Count()
     {
@@ -139,7 +155,11 @@ public class TasbihForm : Form
         n++;
         s.TasbihCounts[idx]++;
         Data.Save(s);
-        if (Target > 0 && n == Target) SystemSounds.Asterisk.Play();
+        if (Target > 0 && n == Target)
+        {
+            SystemSounds.Asterisk.Play();
+            praise = L.T(PraiseKeys[Random.Shared.Next(PraiseKeys.Length)]); // a little variety
+        }
         UpdateView();
     }
 
@@ -179,9 +199,9 @@ public class TasbihForm : Form
                     g.DrawArc(arc, r, -90, Math.Max(sweep, 1));
             using var big = Theme.UI(36f, FontStyle.Bold);
             using var small = Theme.UI(11f);
-            TextRenderer.DrawText(g, f.Current.ToString(), big, new Rectangle(0, 0, Width, Height - Theme.Dp(20)), Theme.Text,
+            TextRenderer.DrawText(g, f.Current.ToString(), big, new Rectangle(0, 0, Width, Height - Theme.Dp(20)), f.Done ? Theme.Accent : Theme.Text,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            TextRenderer.DrawText(g, f.Target > 0 ? $"/ {f.Target}" : "∞", small, new Rectangle(0, Height / 2 + Theme.Dp(18), Width, Theme.Dp(24)), Theme.Muted,
+            TextRenderer.DrawText(g, f.Done ? $"✓ {f.Target}" : f.Target > 0 ? $"/ {f.Target}" : "∞", small, new Rectangle(0, Height / 2 + Theme.Dp(18), Width, Theme.Dp(24)), f.Done ? Theme.Accent : Theme.Muted,
                 TextFormatFlags.HorizontalCenter);
         }
     }

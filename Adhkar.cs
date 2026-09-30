@@ -162,7 +162,9 @@ public class AdhkarForm : Form
     void UpdateProgress()
     {
         var done = items.Count(it => CountOf(it) >= it.Target);
-        progress.Text = string.Format(L.T("AdhkarProgress"), done, items.Count);
+        progress.Text = items.Count > 0 && done == items.Count
+            ? L.T("AdhkarAllDone") // everything read: praise instead of the counter
+            : string.Format(L.T("AdhkarProgress"), done, items.Count);
         progress.Margin = new Padding(0, Theme.Dp(8), Theme.Dp(12), 0);
     }
 
