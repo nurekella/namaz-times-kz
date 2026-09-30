@@ -20,10 +20,10 @@ public static class L
 
     static readonly Dictionary<string, (string Kk, string Ru, string En)> S = new()
     {
-        [nameof(P.Tahajjud)] = ("Тәһажжуд", "Тахаджуд", "Tahajjud"),
+        [nameof(P.Tahajjud)] = ("Таһажуд", "Тахаджуд", "Tahajjud"),
         [nameof(P.Fajr)] = ("Таң", "Фаджр", "Fajr"),
-        [nameof(P.Sunrise)] = ("Күн шығуы", "Восход", "Sunrise"),
-        [nameof(P.Duha)] = ("Дұха", "Духа", "Duha"),
+        [nameof(P.Sunrise)] = ("Күн", "Восход", "Sunrise"),
+        [nameof(P.Duha)] = ("Духа", "Духа", "Duha"),
         [nameof(P.Dhuhr)] = ("Бесін", "Зухр", "Dhuhr"),
         [nameof(P.Asr)] = ("Екінті", "Аср", "Asr"),
         [nameof(P.Maghrib)] = ("Ақшам", "Магриб", "Maghrib"),

@@ -88,9 +88,37 @@ public class Widget : Form
         if (IsHandleCreated) Relayout();
     }
 
+    /// One line of the prayer card; Sunrise carries Duha as a sub-line like the KZ mobile apps.
+    record Row(P P, DateTime At, DateTime? Duha)
+    {
+        public int H => Duha == null ? 34 : 48;
+    }
+    List<Row> rows = [];
+    P? current;
+
+    static DateTime? Find(List<(P P, DateTime At)>? l, P p) => l?.Where(x => x.P == p).Select(x => (DateTime?)x.At).FirstOrDefault();
+
+    void BuildRows(DateTime now)
+    {
+        rows = [];
+        current = null;
+        if (today == null) return;
+        void Add(P p, DateTime? t, DateTime? duha = null) { if (t is { } v && IsShown(p)) rows.Add(new(p, v, duha)); }
+        var duhaSub = IsShown(P.Sunrise) && IsShown(P.Duha);
+        Add(P.Fajr, Find(today, P.Fajr));
+        Add(P.Sunrise, Find(today, P.Sunrise), duhaSub ? Find(today, P.Duha) : null);
+        if (!IsShown(P.Sunrise)) Add(P.Duha, Find(today, P.Duha));
+        foreach (var p in new[] { P.Dhuhr, P.Asr, P.Maghrib, P.Isha }) Add(p, Find(today, p));
+        // Tahajjud goes last: tonight's, unless we are still in the night before today's Fajr.
+        var tomorrow = Data.Times(DateOnly.FromDateTime(now).AddDays(1), Get, s);
+        Add(P.Tahajjud, now < Find(today, P.Fajr) ? Find(today, P.Tahajjud) : Find(tomorrow, P.Tahajjud));
+        // Current period = last passed time today (Duha is a sub-line, not a period); before the first one it's still Isha.
+        current = today.LastOrDefault(x => x.P != P.Duha && x.At <= now) is { At.Year: > 1 } c ? c.P : P.Isha;
+    }
+
     int HeaderLines => 3 + (holiday != null ? 1 : 0);
-    int Rows => Enum.GetValues<P>().Count(IsShown);
-    int ContentHeight => 52 + HeaderLines * 18 + 10 + Math.Max(Rows, 2) * 26 + 8; // at 96 dpi, zoom 100
+    int CardHeight => 6 + Math.Max(rows.Sum(r => r.H), 60) + 4 + 38;
+    int ContentHeight => 10 + HeaderLines * 19 + 8 + CardHeight + 12; // at 96 dpi, zoom 100
     Size SizeFor() => new(Zi(BaseWidth), Zi(ContentHeight));
 
     void Relayout()
@@ -155,12 +183,14 @@ public class Widget : Form
         var date = DateOnly.FromDateTime(now);
         today = Data.Times(date, Get, s);
         next = Data.Next(now, Get, IsShown, s);
+        var height = ContentHeight;
         if (date != shownDate)
         {
             shownDate = date;
             holiday = Hijri.On(date, s.HijriAdjust);
-            if (IsHandleCreated) Relayout();
         }
+        BuildRows(now);
+        if (ContentHeight != height && IsHandleCreated) Relayout();
 
         // Fire alerts for moments crossed since last tick; skip stale ones (e.g. after sleep).
         bool Crossed(DateTime t) => lastTick < t && t <= now && now - t < TimeSpan.FromMinutes(5);
@@ -204,76 +234,114 @@ public class Widget : Form
         catch { /* offline or rate-limited: try again tomorrow */ }
     }
 
-    static string Fmt(TimeSpan t) => $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}";
+    static string Fmt(TimeSpan t) => $"{(int)t.TotalHours:00}:{t.Minutes:00}:{t.Seconds:00}";
+
+    // Palette of the KZ mobile prayer apps: night-sky background, grey card, green "next" bar.
+    static readonly Color Sky1 = Color.FromArgb(10, 16, 38), Sky2 = Color.FromArgb(27, 36, 66);
+    static readonly Color CardFill = Color.FromArgb(242, 44, 46, 54), CardBorder = Color.FromArgb(70, 255, 255, 255);
+    static readonly Color Pill = Color.FromArgb(78, 80, 90), Green = Color.FromArgb(22, 163, 116);
+    static readonly Color Grey = Color.FromArgb(142, 142, 147), Speaker = Color.FromArgb(128, 131, 138);
 
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        using var small = F(8.5f);
-        using var normal = F(10f);
-        using var bold = F(10f, FontStyle.Bold);
-        using var clock = F(20f, FontStyle.Bold);
-        using var countdown = F(11f, FontStyle.Bold);
-        using var icons = new Font("Segoe MDL2 Assets", 9f * EZ / 100f);
+        using var head = F(10f);
+        using var small = F(9f);
+        using var name = F(11.5f, FontStyle.Bold);
+        using var time = F(12f, FontStyle.Bold);
+        using var clock = F(14f, FontStyle.Bold);
+        using var icons = new Font("Segoe MDL2 Assets", 10f * EZ / 100f);
+        var now = DateTime.Now;
+        const TextFormatFlags Right = TextFormatFlags.Right | TextFormatFlags.VerticalCenter;
+        const TextFormatFlags Left = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
+
+        // Background: gradient night sky with a few fixed stars.
+        using (var sky = new LinearGradientBrush(ClientRectangle, Sky1, Sky2, 90f)) g.FillRectangle(sky, ClientRectangle);
+        var rnd = new Random(7);
+        var starCount = ClientSize.Width * ClientSize.Height / Math.Max(1, Zi(38) * Zi(38));
+        for (int i = 0; i < starCount; i++)
+        {
+            var d = Z(0.8f + (float)rnd.NextDouble() * 1.6f);
+            using var star = new SolidBrush(Color.FromArgb(rnd.Next(50, 170), Color.White));
+            g.FillEllipse(star, (float)rnd.NextDouble() * ClientSize.Width, (float)rnd.NextDouble() * ClientSize.Height, d, d);
+        }
+
         // Content is BaseWidth wide; in fullscreen it is scaled up and centred on the screen.
         int cw = Zi(BaseWidth), ox = (ClientSize.Width - cw) / 2, oy = full ? (ClientSize.Height - Zi(ContentHeight)) / 2 : 0;
-        int left = ox + Zi(14), right = ox + cw - Zi(14);
-        var now = DateTime.Now;
+        float left = ox + Z(14), right = ox + cw - Z(14);
 
-        TextRenderer.DrawText(g, now.ToString("HH:mm"), clock, new Point(left - Zi(2), oy + Zi(6)), Theme.Text);
-        if (next is { } n)
+        // Header: clock on the left; location, dates and holiday right-aligned.
+        TextRenderer.DrawText(g, now.ToString("HH:mm"), clock, new Point((int)left - Zi(2), oy + Zi(6)), Color.White);
+        float y = oy + Z(10);
+        var city = s.City.Title + (s.Muted ? " 🔕" : "");
+        var cityW = TextRenderer.MeasureText(g, city, head, Size.Empty, TextFormatFlags.NoPadding).Width;
+        TextRenderer.DrawText(g, city, head, Rectangle.Round(new RectangleF(left, y, right - left, Z(19))), Color.White, Right | TextFormatFlags.EndEllipsis);
+        // Location arrow (like iOS "location.fill"); Segoe MDL2 has no such glyph.
+        float ax = right - cityW - Z(19), ay = y + Z(4.5f), a = Z(10);
+        using (var arrow = new SolidBrush(Color.White))
+            g.FillPolygon(arrow, new PointF[] { new(ax + a, ay), new(ax, ay + a * 0.42f), new(ax + a * 0.45f, ay + a * 0.55f), new(ax + a * 0.58f, ay + a) });
+        y += Z(19);
+        var date = now.ToString(L.Lang == "ru" ? "d MMMM yyyy" : "d MMMM, yyyy", L.Culture);
+        if (L.Lang != "ru") { var sp = date.IndexOf(' ') + 1; date = date[..sp] + char.ToUpper(date[sp], L.Culture) + date[(sp + 1)..]; }
+        var lines = new List<(string Text, Color Color)> { (date, Grey), (Hijri.Format(DateOnly.FromDateTime(now), s.HijriAdjust), Grey) };
+        if (holiday != null) lines.Add(("✦ " + L.T(holiday.Key), Theme.Accent));
+        foreach (var (text, color) in lines)
         {
-            TextRenderer.DrawText(g, L.Name(n.P), small, new Rectangle(ox, oy + Zi(10), right - ox, Zi(18)), Theme.Muted, TextFormatFlags.Right);
-            TextRenderer.DrawText(g, "−" + Fmt(n.At - now), countdown, new Rectangle(ox, oy + Zi(26), right - ox, Zi(22)), Theme.Accent, TextFormatFlags.Right);
+            TextRenderer.DrawText(g, text, head, Rectangle.Round(new RectangleF(left, y, right - left, Z(19))), color, Right | TextFormatFlags.EndEllipsis);
+            y += Z(19);
         }
+        y += Z(8);
 
-        float y = oy + Z(52);
-        void Line(string text, Color c)
-        {
-            TextRenderer.DrawText(g, text, small, new Rectangle(left, (int)y, right - left, Zi(18)), c, TextFormatFlags.EndEllipsis);
-            y += Z(18);
-        }
-        var greg = now.ToString("dddd, d MMMM yyyy", L.Culture);
-        Line(char.ToUpper(greg[0], L.Culture) + greg[1..], Theme.Muted);
-        Line(Hijri.Format(DateOnly.FromDateTime(now), s.HijriAdjust), Theme.Muted);
-        Line(s.City.Title + (s.Muted ? "  ·  🔕" : ""), Theme.Muted);
-        if (holiday != null) Line("✦ " + L.T(holiday.Key), Theme.Accent);
-
-        y += Z(4);
-        using (var pen = new Pen(Theme.Line, Math.Max(1, Z(1)))) g.DrawLine(pen, left, y, right, y);
-        y += Z(6);
-
+        // Card with prayer rows.
+        var card = new RectangleF(ox + Z(12), y, cw - Z(24), Z(CardHeight));
+        using var cardPath = Theme.RoundRect(card, Z(14));
+        using (var fill = new SolidBrush(CardFill)) g.FillPath(fill, cardPath);
+        float rx = card.X + Z(14), rr = card.Right - Z(14), ry = card.Y + Z(6);
         bells.Clear();
         if (today == null)
-            TextRenderer.DrawText(g, L.T("NoData"), normal, new Point(left, (int)y), Theme.Text);
-        var rowH = Z(26);
-        var bellW = Z(22);
-        foreach (var (p, t) in (today ?? []).Where(x => IsShown(x.P)))
+            TextRenderer.DrawText(g, L.T("NoData"), small, Rectangle.Round(new RectangleF(rx, ry, rr - rx, Z(60))), Color.White, Left);
+        foreach (var r in rows)
         {
-            var isNext = next is { } nn && nn.P == p && nn.At == t;
-            if (isNext)
+            var h = Z(r.H);
+            if (r.Duha is { } duha)
             {
-                using var b = new SolidBrush(Color.FromArgb(40, Theme.Accent));
-                using var path = Theme.RoundRect(new RectangleF(ox + Z(6), y - Z(2), cw - Z(12), rowH - Z(2)), Z(6));
-                g.FillPath(b, path);
+                TextRenderer.DrawText(g, L.Name(r.P), name, Rectangle.Round(new RectangleF(rx, ry + Z(4), rr - rx, Z(24))), Color.White, Left);
+                TextRenderer.DrawText(g, $"{L.Name(P.Duha)} {duha:HH:mm}", small, Rectangle.Round(new RectangleF(rx, ry + Z(26), rr - rx, Z(18))), Grey, Left);
             }
-            var main = p is P.Fajr or P.Dhuhr or P.Asr or P.Maghrib or P.Isha;
-            var color = isNext ? Theme.Accent : main ? Theme.Text : Theme.Muted;
-            var font = isNext ? bold : normal;
-            var row = new Rectangle(left, (int)y, right - left, (int)rowH);
-            TextRenderer.DrawText(g, L.Name(p), font, row, color, TextFormatFlags.VerticalCenter);
-            TextRenderer.DrawText(g, t.ToString("HH:mm"), font, new Rectangle(row.X, row.Y, (int)(row.Width - bellW), row.Height), color,
-                TextFormatFlags.Right | TextFormatFlags.VerticalCenter);
+            else TextRenderer.DrawText(g, L.Name(r.P), name, Rectangle.Round(new RectangleF(rx, ry, rr - rx, h)), Color.White, Left);
 
-            // Bell: click toggles this prayer's notification.
-            var on = s.Alerts.Contains(p);
-            var bell = new RectangleF(right - bellW + Z(4), y, bellW, rowH);
-            TextRenderer.DrawText(g, on ? "" : "", icons, Rectangle.Round(bell), // Ringer / RingerSilent
-                on && !s.Muted ? Theme.Accent : Color.FromArgb(110, Theme.Muted), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            bells.Add((bell, p));
-            y += rowH;
+            var t = r.At.ToString("HH:mm");
+            if (r.P == current)
+            {
+                var tw = TextRenderer.MeasureText(g, t, time, Size.Empty, TextFormatFlags.NoPadding).Width;
+                var ph = Z(26);
+                using var pill = Theme.RoundRect(new RectangleF(rr - tw - Z(7), ry + (h - ph) / 2, tw + Z(12), ph), Z(6));
+                using var pb = new SolidBrush(Pill);
+                g.FillPath(pb, pill);
+            }
+            TextRenderer.DrawText(g, t, time, Rectangle.Round(new RectangleF(rx, ry, rr - rx, h)), Color.White, Right);
+
+            // Speaker: click toggles this prayer's notification.
+            var on = s.Alerts.Contains(r.P);
+            var icon = new RectangleF(rr - Z(92), ry, Z(24), h);
+            TextRenderer.DrawText(g, on ? "" : "", icons, Rectangle.Round(icon), // Volume3 / Volume0
+                on && !s.Muted ? Color.FromArgb(205, 208, 214) : Speaker, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            bells.Add((icon, r.P));
+            ry += h;
         }
+
+        // Green bar: next prayer and countdown, clipped to the card's rounded bottom.
+        if (next is { } n)
+        {
+            var bar = new RectangleF(card.X, card.Bottom - Z(38), card.Width, Z(38));
+            g.SetClip(cardPath);
+            using (var gb = new SolidBrush(Green)) g.FillRectangle(gb, bar);
+            g.ResetClip();
+            TextRenderer.DrawText(g, L.Name(n.P), name, Rectangle.Round(new RectangleF(rx, bar.Y, rr - rx, bar.Height)), Color.White, Left);
+            TextRenderer.DrawText(g, Fmt(n.At - now), time, Rectangle.Round(new RectangleF(rx, bar.Y, rr - rx, bar.Height)), Color.White, Right);
+        }
+        using (var border = new Pen(CardBorder, Math.Max(1, Z(1)))) g.DrawPath(border, cardPath);
 
         // Window buttons (minimize / fullscreen / close) appear while the mouse is over the widget.
         var bw = full ? Theme.Dp(46) : Z(26);
@@ -281,13 +349,13 @@ public class Widget : Form
         for (int i = 0; i < 3; i++) captions[i] = new RectangleF(ClientSize.Width - (3 - i) * bw, 0, bw, bh);
         if (!hover) return;
         using var capFont = new Font("Segoe MDL2 Assets", full ? 8f : 7f * EZ / 100f);
-        using (var bg = new SolidBrush(Theme.Bg)) g.FillRectangle(bg, captions[0].X, 0, 3 * bw, bh);
+        using (var bg = new SolidBrush(Sky1)) g.FillRectangle(bg, captions[0].X, 0, 3 * bw, bh);
         string[] glyphs = ["", full ? "" : "", ""]; // ChromeMinimize, ChromeRestore/Maximize, ChromeClose
         for (int i = 0; i < 3; i++)
         {
             if (i == hot)
                 using (var hb = new SolidBrush(i == 2 ? Color.FromArgb(196, 43, 28) : Theme.Line)) g.FillRectangle(hb, captions[i]);
-            TextRenderer.DrawText(g, glyphs[i], capFont, Rectangle.Round(captions[i]), i == hot ? Color.White : Theme.Muted,
+            TextRenderer.DrawText(g, glyphs[i], capFont, Rectangle.Round(captions[i]), i == hot ? Color.White : Grey,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         }
     }

@@ -34,6 +34,7 @@ public class Day
     public string Date { get; set; } = "";
     public string Fajr { get; set; } = "";
     public string Sunrise { get; set; } = "";
+    public string Sunset { get; set; } = "";
     public string Dhuhr { get; set; } = "";
     public string Asr { get; set; } = "";
     public string Maghrib { get; set; } = "";
@@ -51,9 +52,6 @@ public static class Data
     };
     static readonly HttpClient Http = new() { BaseAddress = new("https://api.muftyat.kz/"), Timeout = TimeSpan.FromSeconds(10) };
     // ponytail: sync fetch on the UI thread, once per city+year (cached to disk); go async if the startup freeze bothers anyone.
-
-    // Duha starts once the sun is a spear's length up; 20 min after sunrise is the common KZ convention.
-    static readonly TimeSpan DuhaAfterSunrise = TimeSpan.FromMinutes(20);
 
     public static Settings LoadSettings()
     {
@@ -121,6 +119,7 @@ public static class Data
 
     /// All times of a calendar day in order, with madhab and manual offsets applied.
     /// Tahajjud = start of the last third of the night that ends at this day's Fajr.
+    /// Duha = a quarter of the daylight after sunrise (the preferred Duha time, as KZ apps show it).
     public static List<(P P, DateTime At)>? Times(DateOnly date, Func<DateOnly, Day?> getDay, Settings? s = null)
     {
         if (getDay(date) is not { } d) return null;
@@ -134,7 +133,7 @@ public static class Data
         if (getDay(date.AddDays(-1)) is { } y && At(date.AddDays(-1), y.Maghrib) + Off(P.Maghrib) is var m)
             list.Add((P.Tahajjud, CeilMinute(m + (fajr - m) * 2 / 3) + Off(P.Tahajjud)));
         list.AddRange([
-            (P.Fajr, fajr), (P.Sunrise, sunrise), (P.Duha, sunrise + DuhaAfterSunrise + Off(P.Duha)),
+            (P.Fajr, fajr), (P.Sunrise, sunrise), (P.Duha, CeilMinute(sunrise + (At(date, d.Sunset) - sunrise) / 4) + Off(P.Duha)),
             (P.Dhuhr, At(date, d.Dhuhr) + Off(P.Dhuhr)), (P.Asr, asr),
             (P.Maghrib, At(date, d.Maghrib) + Off(P.Maghrib)), (P.Isha, At(date, d.Isha) + Off(P.Isha)),
         ]);
@@ -187,7 +186,7 @@ static class Program
 
     static int SelfTest()
     {
-        var d = new Day { Fajr = "05:00", Sunrise = "06:30", Dhuhr = "12:00", Asr = "15:00", Maghrib = "18:00", Isha = "19:30" };
+        var d = new Day { Fajr = "05:00", Sunrise = "06:30", Sunset = "18:30", Dhuhr = "12:00", Asr = "15:00", Maghrib = "18:00", Isha = "19:30" };
         Day? Get(DateOnly _) => d;
         bool All(P _) => true;
         var day = new DateOnly(2026, 12, 31);
@@ -195,7 +194,7 @@ static class Program
 
         var times = Data.Times(day, Get)!;
         Trace.Assert(times[0] == (P.Tahajjud, T(1, 20)), "18:00→05:00 is 11h, last third starts at 01:20");
-        Trace.Assert(times[3] == (P.Duha, T(6, 50)));
+        Trace.Assert(times[3] == (P.Duha, T(9, 30)), "06:30 + (18:30 − 06:30) / 4");
         Trace.Assert(Data.Next(T(0, 0), Get, All) == (P.Tahajjud, T(1, 20)));
         Trace.Assert(Data.Next(T(12, 0), Get, All) == (P.Asr, T(15, 0)), "exactly at time -> next one");
         Trace.Assert(Data.Next(T(20, 0), Get, All) == (P.Tahajjud, T(1, 20, 1)), "rolls to tomorrow");
