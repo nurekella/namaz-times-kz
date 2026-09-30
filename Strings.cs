@@ -18,6 +18,9 @@ public static class L
 
     public static string Name(P p) => T(p.ToString());
 
+    public static bool Hour12;
+    public static string Time(DateTime t) => t.ToString(Hour12 ? "h:mm tt" : "HH:mm", CultureInfo.InvariantCulture);
+
     static readonly Dictionary<string, (string Kk, string Ru, string En)> S = new()
     {
         [nameof(P.Tahajjud)] = ("Таһажуд", "Тахаджуд", "Tahajjud"),
@@ -47,6 +50,9 @@ public static class L
 
         // settings
         ["General"] = ("Жалпы", "Общие", "General"),
+        ["TimeFormat"] = ("Уақыт форматы", "Формат времени", "Time format"),
+        ["H24"] = ("24 сағат", "24 часа", "24-hour"),
+        ["H12"] = ("12 сағат", "12 часов", "12-hour"),
         ["Language"] = ("Тіл", "Язык", "Language"),
         ["City"] = ("Елді мекен", "Населённый пункт", "Location"),
         ["AsrMethod"] = ("Екінті уақыты", "Время Асра", "Asr time"),

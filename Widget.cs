@@ -81,6 +81,7 @@ public class Widget : Form
     public void ApplySettings()
     {
         L.Lang = s.Lang;
+        L.Hour12 = s.Hour12;
         showItem.Text = L.T("ShowWidget");
         monthItem.Text = L.T("Month");
         holidaysItem.Text = L.T("Holidays");
@@ -118,7 +119,7 @@ public class Widget : Form
         if (today == null) return;
         var ramadan = IsRamadan(now);
         void Add(P p, DateTime? t, string? sub = null) { if (t is { } v && IsShown(p)) rows.Add(new(p, v, sub)); }
-        var duhaSub = IsShown(P.Sunrise) && IsShown(P.Duha) && Find(today, P.Duha) is { } duha ? $"{L.Name(P.Duha)} {duha:HH:mm}" : null;
+        var duhaSub = IsShown(P.Sunrise) && IsShown(P.Duha) && Find(today, P.Duha) is { } duha ? $"{L.Name(P.Duha)} {L.Time(duha)}" : null;
         Add(P.Fajr, Find(today, P.Fajr), ramadan ? L.T("Suhoor") : null);
         Add(P.Sunrise, Find(today, P.Sunrise), duhaSub);
         if (!IsShown(P.Sunrise)) Add(P.Duha, Find(today, P.Duha));
@@ -206,7 +207,7 @@ public class Widget : Form
     public void TestAlert()
     {
         var (p, t) = next ?? (P.Fajr, DateTime.Today.AddHours(5));
-        tray.ShowBalloonTip(10000, $"{L.Name(p)} — {t:HH:mm}", $"{L.T("PrayerTime")} · {s.City.Title}", ToolTipIcon.None);
+        tray.ShowBalloonTip(10000, $"{L.Name(p)} — {L.Time(t)}", $"{L.T("PrayerTime")} · {s.City.Title}", ToolTipIcon.None);
     }
 
     void Tick()
@@ -230,12 +231,12 @@ public class Widget : Form
         foreach (var (p, t) in (today ?? []).Concat(Data.Times(date.AddDays(1), Get, s) ?? []))
         {
             if (p == P.Dhuhr && s.Jumuah && t.DayOfWeek == DayOfWeek.Friday && Crossed(t.AddMinutes(-s.JumuahBefore)))
-                Notify(L.T("Jumuah"), $"{L.Name(P.Dhuhr)} {t:HH:mm} · {place}");
+                Notify(L.T("Jumuah"), $"{L.Name(P.Dhuhr)} {L.Time(t)} · {place}");
             if (!s.Alerts.Contains(p)) continue;
             if (Crossed(t))
-                Notify($"{L.Name(p)} — {t:HH:mm}", $"{L.T("PrayerTime")} · {place}");
+                Notify($"{L.Name(p)} — {L.Time(t)}", $"{L.T("PrayerTime")} · {place}");
             if (s.RemindBefore > 0 && Crossed(t.AddMinutes(-s.RemindBefore)))
-                Notify(string.Format(L.T("InMin"), L.Name(p), s.RemindBefore), $"{t:HH:mm} · {place}");
+                Notify(string.Format(L.T("InMin"), L.Name(p), s.RemindBefore), $"{L.Time(t)} · {place}");
         }
         lastTick = now;
 
@@ -305,7 +306,7 @@ public class Widget : Form
         float left = ox + Z(14), right = ox + cw - Z(14);
 
         // Header: clock on the left; location, dates and holiday right-aligned.
-        TextRenderer.DrawText(g, now.ToString("HH:mm"), clock, new Point((int)left - Zi(2), oy + Zi(TopStrip + 2)), Color.White);
+        TextRenderer.DrawText(g, L.Time(now), clock, new Point((int)left - Zi(2), oy + Zi(TopStrip + 2)), Color.White);
         float y = oy + Z(TopStrip + 6);
         var city = s.City.Title + (s.Muted ? " 🔕" : "");
         var cityW = TextRenderer.MeasureText(g, city, head, Size.Empty, TextFormatFlags.NoPadding).Width;
@@ -346,7 +347,7 @@ public class Widget : Form
             else TextRenderer.DrawText(g, L.Name(r.P), name, Rectangle.Round(new RectangleF(rx, ry, rr - rx, h)), Color.White, Left);
 
             // Times sit centred in a fixed-width box at the right; the current one gets a pill of exactly that box.
-            var boxW = TextRenderer.MeasureText(g, "00:00", time, Size.Empty, TextFormatFlags.NoPadding).Width + Z(14);
+            var boxW = TextRenderer.MeasureText(g, L.Hour12 ? "00:00 PM" : "00:00", time, Size.Empty, TextFormatFlags.NoPadding).Width + Z(14);
             var box = new RectangleF(rr - boxW + Z(6), ry + (h - Z(28)) / 2, boxW, Z(28));
             if (r.P == current)
             {
@@ -354,12 +355,12 @@ public class Widget : Form
                 using var pb = new SolidBrush(Pill);
                 g.FillPath(pb, pill);
             }
-            TextRenderer.DrawText(g, r.At.ToString("HH:mm"), time, Rectangle.Round(box), Color.White,
+            TextRenderer.DrawText(g, L.Time(r.At), time, Rectangle.Round(box), Color.White,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
 
             // Speaker: click toggles this prayer's notification.
             var on = s.Alerts.Contains(r.P);
-            var icon = new RectangleF(rr - Z(92), ry, Z(24), h);
+            var icon = new RectangleF(box.X - Z(30), ry, Z(24), h);
             TextRenderer.DrawText(g, on ? "" : "", icons, Rectangle.Round(icon), // Volume3 / Volume0
                 on && !s.Muted ? Color.FromArgb(205, 208, 214) : Speaker, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             bells.Add((icon, r.P));

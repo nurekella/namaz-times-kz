@@ -70,7 +70,7 @@ public class MonthForm : Form
             {
                 var times = Data.Times(d, x => Data.GetDay(s.City, x), s);
                 var cells = new List<object> { d.ToString("d MMM, ddd", L.Culture), Hijri.Format(d, s.HijriAdjust) };
-                cells.AddRange(cols.Select(p => (object)(times?.Where(t => t.P == p).Select(t => t.At.ToString("HH:mm")).FirstOrDefault() ?? "—")));
+                cells.AddRange(cols.Select(p => (object)(times?.Where(t => t.P == p).Select(t => L.Time(t.At)).FirstOrDefault() ?? "—")));
                 var r = grid.Rows[grid.Rows.Add(cells.ToArray())];
                 if (d == now) Grid.Highlight(r, Theme.Accent);
                 else if (d.DayOfWeek == DayOfWeek.Friday) r.DefaultCellStyle.BackColor = Theme.Card;

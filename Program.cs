@@ -13,6 +13,7 @@ public class Settings
     public City City { get; set; } = new("Алматы қаласы", "43.238293", "76.945465");
     public string Lang { get; set; } = L.Default();
     public bool Hanafi { get; set; } = true;
+    public bool Hour12 { get; set; }
     public Dictionary<P, int> Offsets { get; set; } = [];
     public int HijriAdjust { get; set; }
     public HashSet<P> Hidden { get; set; } = [];

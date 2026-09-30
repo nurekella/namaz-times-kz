@@ -37,6 +37,8 @@ public class SettingsForm : Form
         Row(g1, L.T("City"), cityBtn);
         var madhab = new Segmented([L.T("Hanafi"), L.T("OtherMadhabs")], s.Hanafi ? 0 : 1);
         Row(g1, L.T("AsrMethod"), madhab);
+        var timeFormat = new Segmented([L.T("H24"), L.T("H12")], s.Hour12 ? 1 : 0);
+        Row(g1, L.T("TimeFormat"), timeFormat);
         var hijri = new Stepper(s.HijriAdjust, -2, 2, 1, v => v > 0 ? $"+{v}" : v.ToString());
         Row(g1, L.T("HijriAdjust"), hijri);
 
@@ -114,6 +116,7 @@ public class SettingsForm : Form
             s.Lang = L.Languages[lang.Selected].Code;
             s.City = city;
             s.Hanafi = madhab.Selected == 0;
+            s.Hour12 = timeFormat.Selected == 1;
             s.HijriAdjust = hijri.Value;
             s.Muted = !notifyOn.Checked;
             s.RemindBefore = remind.Value;
