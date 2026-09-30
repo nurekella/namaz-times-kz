@@ -139,7 +139,7 @@ public class Widget : Form
         BackColor = Color.FromArgb(24, 28, 34);
         TopMost = s.TopMost;
         Text = "Намаз";
-        Icon = MakeIcon();
+        Icon = LoadIcon();
 
         var menu = new ContextMenuStrip();
         showItem = new ToolStripMenuItem("Показать виджет", null, (_, _) => SetWidgetVisible(!Visible)) { CheckOnClick = false };
@@ -301,18 +301,8 @@ public class Widget : Form
         Tick();
     }
 
-    static Icon MakeIcon()
-    {
-        using var bmp = new Bitmap(32, 32);
-        using (var g = Graphics.FromImage(bmp))
-        {
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.FillEllipse(new SolidBrush(Color.FromArgb(94, 196, 140)), 3, 3, 26, 26);
-            g.CompositingMode = CompositingMode.SourceCopy;
-            g.FillEllipse(Brushes.Transparent, 10, 1, 24, 24); // cut out -> crescent
-        }
-        return Icon.FromHandle(bmp.GetHicon());
-    }
+    static Icon LoadIcon() =>
+        new(typeof(Widget).Assembly.GetManifestResourceStream("app.ico")!, SystemInformation.SmallIconSize);
 
     [DllImport("user32.dll")] static extern bool ReleaseCapture();
     [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h, int msg, int w, int l);
