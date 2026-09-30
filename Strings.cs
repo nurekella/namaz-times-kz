@@ -74,6 +74,8 @@ public static class L
         ["UnitDays"] = ("күн", "дней", "days"),
         ["UnitMonths"] = ("ай", "месяцев", "months"),
         ["UnitYears"] = ("жыл", "лет", "years"),
+        ["TargetRecommended"] = ("Ұсынылған", "Рекоменд.", "Suggested"),
+        ["RecommendedTimes"] = ("ұсынылады: {0} рет", "рекомендуется: {0} раз", "suggested: {0} times"),
         ["Exit"] = ("Шығу", "Выход", "Exit"),
         ["Update"] = ("Жаңарту: {0}", "Обновить до {0}", "Update to {0}"),
         ["UpdateAvail"] = ("Жаңа нұсқа шықты: {0}. Жаңарту үшін басыңыз.", "Вышла новая версия {0}. Нажмите, чтобы обновить.", "New version {0} is out. Click to update."),

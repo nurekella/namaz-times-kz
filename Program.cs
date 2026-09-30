@@ -18,7 +18,7 @@ public class Settings
     public bool Hour12 { get; set; }
     public FastingMode Fasting { get; set; }
     public bool ShowNameOfDay { get; set; } = true;
-    public int TasbihTarget { get; set; } = 33;
+    public int TasbihTarget { get; set; } = -1; // -1 = the recommended count of the selected dhikr
     public string TasbihDate { get; set; } = "";
     public int[] TasbihCounts { get; set; } = [];
     public Dictionary<P, int> Offsets { get; set; } = [];

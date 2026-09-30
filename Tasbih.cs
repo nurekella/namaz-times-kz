@@ -1,34 +1,32 @@
 using System.Drawing.Drawing2D;
 using System.Media;
+using System.Text.Json;
 
 namespace NamazTimes;
 
-public record Dhikr(string Ar, string Kk, string Ru, string En, string Mkk, string Mru, string Men)
+/// A dhikr with its recommended count and virtue. Texts live in dhikr.json (kk/ru/en) for review.
+/// Order matters: saved daily counts are indexed by position, so new entries go at the end.
+public record Dhikr(string Ar, int Recommended, JsonElement Json)
 {
-    public string Translit => L.Lang switch { "kk" => Kk, "en" => En, _ => Ru };
-    public string Meaning => L.Lang switch { "kk" => Mkk, "en" => Men, _ => Mru };
+    string Tr(string field) => Json.GetProperty(field).GetProperty(L.Lang is "kk" or "en" ? L.Lang : "ru").GetString()!;
+    public string Translit => Tr("t");
+    public string Meaning => Tr("m");
+    public string Virtue => Tr("v");
+    public string Source => Tr("ref");
 
-    public static readonly Dhikr[] All =
-    [
-        new("سُبْحَانَ ٱللَّٰهِ", "Субханаллаһ", "Субханаллах", "SubhanAllah",
-            "Аллаһ барлық кемшіліктен пәк", "Пречист Аллах", "Glory be to Allah"),
-        new("ٱلْحَمْدُ لِلَّٰهِ", "Әлхамдулиллаһ", "Альхамдулиллях", "Alhamdulillah",
-            "Барлық мақтау Аллаһқа тән", "Хвала Аллаху", "All praise is due to Allah"),
-        new("ٱللَّٰهُ أَكْبَرُ", "Аллаһу әкбар", "Аллаху акбар", "Allahu Akbar",
-            "Аллаһ ең Ұлы", "Аллах велик", "Allah is the Greatest"),
-        new("ٱللَّٰهُمَّ صَلِّ عَلَىٰ مُحَمَّدٍ", "Салауат", "Салават", "Salawat",
-            "Аллаһым, Мұхаммедке салауат айта гөр", "О Аллах, благослови Мухаммада", "O Allah, send blessings upon Muhammad"),
-        new("أَسْتَغْفِرُ ٱللَّٰهَ", "Истиғфар", "Истигфар", "Istighfar",
-            "Аллаһтан кешірім сұраймын", "Прошу прощения у Аллаха", "I seek Allah's forgiveness"),
-    ];
+    public static readonly Lazy<Dhikr[]> All = new(() =>
+        JsonSerializer.Deserialize<List<JsonElement>>(typeof(Dhikr).Assembly.GetManifestResourceStream("dhikr.json")!)!
+            .Select(e => new Dhikr(e.GetProperty("ar").GetString()!, e.GetProperty("n").GetInt32(), e)).ToArray());
 }
 
 /// Digital prayer beads. Counts per dhikr are kept for the current day in settings.
 public class TasbihForm : Form
 {
-    static readonly int[] Targets = [33, 99, 100, 0]; // 0 = no limit
+    const int Recommended = -1; // target = the selected dhikr's recommended count
+    static readonly int[] Targets = [Recommended, 33, 99, 100, 0]; // 0 = no limit
     readonly Settings s;
-    readonly Label ar, translit, meaning, totals;
+    readonly ListBox list;
+    readonly Label ar, translit, meaning, virtue, total;
     readonly Ring ring;
     int idx, n;
 
@@ -44,60 +42,93 @@ public class TasbihForm : Form
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         ResetIfNewDay();
 
-        int w = Theme.Dp(360);
-        Label Centered(Font f, Color c, int h) => new()
+        // Left: every dhikr with today's count
+        list = new ListBox
+        {
+            Dock = DockStyle.Fill, Width = Theme.Dp(300), BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.None,
+            DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = Theme.Dp(40), IntegralHeight = false, Font = Theme.UI(10f),
+            Margin = new Padding(0, 0, Theme.Dp(14), 0),
+        };
+        list.Items.AddRange(Dhikr.All.Value.Select(d => (object)d.Translit).ToArray());
+        list.DrawItem += (_, e) =>
+        {
+            if (e.Index < 0) return;
+            var selected = (e.State & DrawItemState.Selected) != 0;
+            using (var bg = new SolidBrush(selected ? Theme.Line : Theme.Card)) e.Graphics.FillRectangle(bg, e.Bounds);
+            if (selected) using (var bar = new SolidBrush(Theme.Accent)) e.Graphics.FillRectangle(bar, e.Bounds.X, e.Bounds.Y + Theme.Dp(8), Theme.Dp(3), e.Bounds.Height - Theme.Dp(16));
+            var count = s.TasbihCounts[e.Index];
+            var countW = count > 0 ? Theme.Dp(48) : 0;
+            TextRenderer.DrawText(e.Graphics, Dhikr.All.Value[e.Index].Translit, list.Font,
+                new Rectangle(e.Bounds.X + Theme.Dp(14), e.Bounds.Y, e.Bounds.Width - Theme.Dp(20) - countW, e.Bounds.Height),
+                selected ? Theme.Text : Theme.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            if (count > 0)
+                TextRenderer.DrawText(e.Graphics, count.ToString(), list.Font, new Rectangle(e.Bounds.Right - countW - Theme.Dp(10), e.Bounds.Y, countW, e.Bounds.Height),
+                    Theme.Accent, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
+        };
+        list.HandleCreated += (_, _) => Theme.DarkScrollbars(list);
+
+        // Right: the selected dhikr and the counter (fixed heights so the window doesn't jump between dhikrs)
+        int w = Theme.Dp(400);
+        Label Block(Font f, Color c, int h) => new()
         {
             AutoSize = false, Width = w, Height = Theme.Dp(h), TextAlign = ContentAlignment.MiddleCenter, Font = f, ForeColor = c,
             Margin = Padding.Empty, UseMnemonic = false,
         };
-        var chips = new Segmented(Dhikr.All.Select(d => d.Translit), 0) { WrapContents = true, MaximumSize = new Size(w, 0), Anchor = AnchorStyles.None };
-        ar = Centered(new Font(Name99.ArabicFont, 24f * Theme.UiScale), Theme.Text, 56);
+        ar = Block(new Font(Name99.ArabicFont, 22f * Theme.UiScale), Theme.Text, 110);
         ar.RightToLeft = RightToLeft.Yes;
-        translit = Centered(Theme.UI(12f, FontStyle.Bold), Theme.Text, 26);
-        meaning = Centered(Theme.UI(9.5f), Theme.Muted, 40);
-        ring = new Ring(this) { Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(8), 0, Theme.Dp(4)) };
-        var hint = Centered(Theme.UI(8.5f), Theme.Muted, 22);
+        translit = Block(Theme.UI(11f, FontStyle.Bold), Theme.Text, 70);
+        meaning = Block(Theme.UI(9.5f), Theme.Muted, 44);
+        virtue = Block(Theme.UI(9f), NamesForm.Gold, 76);
+        ring = new Ring(this) { Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(6), 0, Theme.Dp(2)) };
+        var hint = Block(Theme.UI(8.5f), Theme.Muted, 22);
         hint.Text = L.T("TapOrSpace");
-        var target = new Segmented(Targets.Select(t => t == 0 ? "∞" : t.ToString()), Math.Max(0, Array.IndexOf(Targets, s.TasbihTarget)));
-        var reset = Theme.Button("↺ " + L.T("Reset"));
-        var targetRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(4), 0, Theme.Dp(8)) };
+        var target = new Segmented(Targets.Select(t => t switch { Recommended => L.T("TargetRecommended"), 0 => "∞", _ => t.ToString() }),
+            Math.Max(0, Array.IndexOf(Targets, s.TasbihTarget)));
+        var reset = Theme.Button("↺");
+        var targetRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(4), 0, Theme.Dp(6)) };
         target.Margin = new Padding(0, 0, Theme.Dp(8), 0);
         targetRow.Controls.AddRange([target, reset]);
-        totals = new Label
-        {
-            AutoSize = false, Width = w, Height = Theme.Dp(130), BackColor = Theme.Card, ForeColor = Theme.Text,
-            Font = Theme.UI(9.5f), Padding = new Padding(Theme.Dp(12), Theme.Dp(8), Theme.Dp(12), Theme.Dp(8)), Margin = Padding.Empty,
-        };
+        total = Block(Theme.UI(10f, FontStyle.Bold), Theme.Accent, 26);
 
-        var root = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Padding = new Padding(Theme.Dp(14)) };
-        root.Controls.AddRange([chips, ar, translit, meaning, ring, hint, targetRow, totals]);
+        var right = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
+        right.Controls.AddRange([ar, translit, meaning, virtue, ring, hint, targetRow, total]);
+        var root = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Padding = new Padding(Theme.Dp(14)) };
+        root.Controls.Add(list);
+        root.Controls.Add(right);
         Controls.Add(root);
 
-        chips.Changed += i => { idx = i; n = 0; UpdateView(); };
+        list.SelectedIndexChanged += (_, _) => { idx = Math.Max(0, list.SelectedIndex); n = 0; UpdateView(); };
         target.Changed += i => { s.TasbihTarget = Targets[i]; n = 0; Data.Save(s); ring.Invalidate(); };
         reset.Click += (_, _) => { n = 0; ring.Invalidate(); };
-        UpdateView();
+        list.SelectedIndex = 0;
     }
 
-    int Target => s.TasbihTarget;
+    int Target => s.TasbihTarget == Recommended ? Dhikr.All.Value[idx].Recommended : s.TasbihTarget;
     int Current => n;
 
     void ResetIfNewDay()
     {
         var today = DateTime.Today.ToString("yyyy-MM-dd");
-        if (s.TasbihDate == today && s.TasbihCounts.Length == Dhikr.All.Length) return;
-        s.TasbihDate = today;
-        s.TasbihCounts = new int[Dhikr.All.Length];
+        var count = Dhikr.All.Value.Length;
+        if (s.TasbihDate != today) { s.TasbihDate = today; s.TasbihCounts = new int[count]; }
+        else if (s.TasbihCounts.Length != count) { var c = s.TasbihCounts; Array.Resize(ref c, count); s.TasbihCounts = c; } // new dhikrs added
     }
 
     void UpdateView()
     {
-        var d = Dhikr.All[idx];
+        var d = Dhikr.All.Value[idx];
         ar.Text = d.Ar;
+        var oldFont = ar.Font; // long dhikrs get a smaller Arabic font so they fit in the fixed box
+        ar.Font = new Font(Name99.ArabicFont, (d.Ar.Length > 70 ? 15f : d.Ar.Length > 35 ? 18f : 24f) * Theme.UiScale);
+        oldFont.Dispose();
         translit.Text = d.Translit;
+        var oldTr = translit.Font;
+        translit.Font = Theme.UI(d.Translit.Length > 80 ? 9.5f : d.Translit.Length > 40 ? 10.5f : 12f, FontStyle.Bold);
+        oldTr.Dispose();
         meaning.Text = d.Meaning;
-        var lines = Dhikr.All.Select((x, i) => (x, c: s.TasbihCounts[i])).Where(t => t.c > 0).Select(t => $"{t.x.Translit}: {t.c}");
-        totals.Text = $"{L.T("TodayCap")}: {s.TasbihCounts.Sum()}\n" + string.Join("\n", lines);
+        virtue.Text = $"{d.Virtue}\n{d.Source} · {string.Format(L.T("RecommendedTimes"), d.Recommended)}";
+        total.Text = $"{L.T("TodayCap")}: {s.TasbihCounts.Sum()}";
+        list.Invalidate();
         ring.Invalidate();
     }
 
