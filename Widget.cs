@@ -20,6 +20,8 @@ public class Widget : Form
     Updates.Release? update;
     int? downloading;          // update download progress, %
     RectangleF updateBanner;
+    RectangleF cityRect;   // location in the header, click = choose city
+    bool hotCity;
     bool balloonIsUpdate;      // last balloon was "new version" → clicking it installs
     SettingsForm? settingsForm;
     MonthForm? monthForm;
@@ -397,10 +399,12 @@ public class Widget : Form
         float y = oy + Z(TopStrip + 6);
         var city = s.City.Title + (s.Muted ? " 🔕" : "");
         var cityW = TextRenderer.MeasureText(g, city, head, Size.Empty, TextFormatFlags.NoPadding).Width;
-        TextRenderer.DrawText(g, city, head, Rectangle.Round(new RectangleF(left, y, right - left, Z(19))), Color.White, Right | TextFormatFlags.EndEllipsis);
+        var cityColor = hotCity ? Theme.Accent : Color.White; // green on hover: it is clickable
+        TextRenderer.DrawText(g, city, head, Rectangle.Round(new RectangleF(left, y, right - left, Z(19))), cityColor, Right | TextFormatFlags.EndEllipsis);
         // Location arrow (like iOS "location.fill"); Segoe MDL2 has no such glyph.
         float ax = right - cityW - Z(19), ay = y + Z(4.5f), a = Z(10);
-        using (var arrow = new SolidBrush(Color.White))
+        cityRect = new RectangleF(ax - Z(4), y, right - ax + Z(4), Z(19));
+        using (var arrow = new SolidBrush(cityColor))
             g.FillPolygon(arrow, new PointF[] { new(ax + a, ay), new(ax, ay + a * 0.42f), new(ax + a * 0.45f, ay + a * 0.55f), new(ax + a * 0.58f, ay + a) });
         y += Z(19);
         var date = now.ToString(L.Lang == "ru" ? "d MMMM yyyy" : "d MMMM, yyyy", L.Culture);
@@ -567,6 +571,7 @@ public class Widget : Form
         }
         if (nameCard.Contains(e.Location)) { OpenNames(); return; }
         if (updateBanner.Contains(e.Location)) { _ = InstallUpdate(); return; }
+        if (cityRect.Contains(e.Location)) { PickCity(); return; }
         foreach (var (r, p) in bells)
             if (r.Contains(e.Location))
             {
@@ -594,7 +599,26 @@ public class Widget : Form
             if (t >= 0) tip.Show(L.T(ToolTips[t]), this, Point.Round(new PointF(tools[t].Left, tools[t].Bottom + Z(4))), 2500);
             else tip.Hide(this);
         }
-        Cursor = h >= 0 || t >= 0 || nameCard.Contains(e.Location) || updateBanner.Contains(e.Location) || bells.Any(b => b.R.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
+        var overCity = cityRect.Contains(e.Location);
+        if (overCity != hotCity)
+        {
+            hotCity = overCity;
+            Invalidate();
+            if (overCity) tip.Show(L.T("ChooseCity"), this, Point.Round(new PointF(cityRect.Left, cityRect.Bottom + Z(4))), 2500);
+            else if (t < 0) tip.Hide(this);
+        }
+        Cursor = h >= 0 || t >= 0 || overCity || nameCard.Contains(e.Location) || updateBanner.Contains(e.Location) || bells.Any(b => b.R.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
+    }
+
+    /// Click on the location in the header: pick another city right away.
+    void PickCity()
+    {
+        using var f = new CityPicker { StartPosition = FormStartPosition.CenterScreen, TopMost = TopMost };
+        if (f.ShowDialog(this) != DialogResult.OK || f.Selected == null) return;
+        s.City = f.Selected;
+        Data.Save(s);
+        shownDate = default;
+        ApplySettings();
     }
 
     protected override void OnMouseLeave(EventArgs e)
