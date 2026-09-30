@@ -748,7 +748,7 @@ public class Widget : Form
     void OpenAdhkar(bool? morning = null)
     {
         adhkarForm?.Close(); // reopen on the requested tab (morning / evening)
-        adhkarForm = new AdhkarForm(morning) { TopMost = TopMost };
+        adhkarForm = new AdhkarForm(s, morning) { TopMost = TopMost };
         adhkarForm.Show();
     }
 

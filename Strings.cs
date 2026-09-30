@@ -81,6 +81,8 @@ public static class L
         ["AdhkarMorning"] = ("Таңғы", "Утренние", "Morning"),
         ["AdhkarEvening"] = ("Кешкі", "Вечерние", "Evening"),
         ["TimesN"] = ("{0} рет", "{0} раз", "{0}×"),
+        ["AdhkarProgress"] = ("Оқылды: {0} / {1}", "Прочитано: {0} / {1}", "Done: {0} / {1}"),
+        ["AdhkarCountHint"] = ("Санау: карточканы немесе батырманы басыңыз; Бос орын — келесі оқылмаған зікір. Прогресс күн сайын жаңарады.", "Счёт: нажмите на карточку или кнопку; пробел — следующий непрочитанный азкар. Прогресс обнуляется каждый день.", "Count: click a card or its button; Space counts the next unfinished one. Progress resets every day."),
         ["AdhkarMorningTitle"] = ("Таңғы зікірлер уақыты", "Время утренних азкаров", "Time for the morning adhkar"),
         ["AdhkarEveningTitle"] = ("Кешкі зікірлер уақыты", "Время вечерних азкаров", "Time for the evening adhkar"),
         ["AdhkarTap"] = ("Оқу үшін басыңыз", "Нажмите, чтобы открыть", "Click to open"),

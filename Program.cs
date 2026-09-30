@@ -56,6 +56,8 @@ public class Settings
     public bool FullscreenAlert { get; set; }
     // Zakat and fitr calculators (last entered values, tenge)
     public ZakatInput Zakat { get; set; } = new();
+    public string AdhkarDate { get; set; } = "";
+    public Dictionary<string, int> AdhkarCounts { get; set; } = []; // today's morning/evening adhkar progress
     public int Opacity { get; set; } = 100;
     public int X { get; set; } = -1;
     public int Y { get; set; } = -1;
