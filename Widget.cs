@@ -25,6 +25,9 @@ public class Widget : Form
     int hot = -1, fullZoom = 100;
     Rectangle normalBounds;
     readonly RectangleF[] captions = new RectangleF[3]; // minimize, fullscreen, close
+    readonly RectangleF[] tools = new RectangleF[2];    // settings, menu — always visible, top-left
+    int hotTool = -1;
+    readonly ToolTip tip = new();
 
     const int BaseWidth = 250;
 
@@ -378,6 +381,24 @@ public class Widget : Form
         if (next is { } n) Bar(card.Bottom - Z(38), Green, L.Name(n.P), n.At - now);
         using (var border = new Pen(CardBorder, Math.Max(1, Z(1)))) g.DrawPath(border, cardPath);
 
+        // Settings and menu buttons: always visible in the top strip, so nobody has to guess the right-click.
+        using (var toolFont = new Font("Segoe MDL2 Assets", 9.5f * EZ / 100f))
+        {
+            string[] toolGlyphs = ["", ""]; // Settings, More
+            for (int i = 0; i < 2; i++)
+            {
+                tools[i] = new RectangleF(ox + Z(8) + i * Z(28), oy + Z(2), Z(26), Z(24));
+                if (i == hotTool)
+                {
+                    using var chip = Theme.RoundRect(tools[i], Z(6));
+                    using var cb = new SolidBrush(Color.FromArgb(60, 255, 255, 255));
+                    g.FillPath(cb, chip);
+                }
+                TextRenderer.DrawText(g, toolGlyphs[i], toolFont, Rectangle.Round(tools[i]), i == hotTool ? Color.White : Grey,
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            }
+        }
+
         // Window buttons (minimize / fullscreen / close) appear while the mouse is over the widget.
         var bw = full ? Theme.Dp(46) : Z(26);
         var bh = full ? Theme.Dp(32) : Z(24);
@@ -399,6 +420,11 @@ public class Widget : Form
     {
         base.OnMouseDown(e);
         if (e.Button != MouseButtons.Left) return;
+        switch (Array.FindIndex(tools, r => r.Contains(e.Location)))
+        {
+            case 0: OpenSettings(); return;
+            case 1: ContextMenuStrip!.Show(this, Point.Round(new PointF(tools[1].Left, tools[1].Bottom))); return;
+        }
         switch (hover ? Array.FindIndex(captions, r => r.Contains(e.Location)) : -1)
         {
             case 0: WindowState = FormWindowState.Minimized; return;
@@ -424,13 +450,21 @@ public class Widget : Form
         base.OnMouseMove(e);
         var h = Array.FindIndex(captions, r => r.Contains(e.Location));
         if (!hover || h != hot) { hover = true; hot = h; Invalidate(); }
-        Cursor = h >= 0 || bells.Any(b => b.R.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
+        var t = Array.FindIndex(tools, r => r.Contains(e.Location));
+        if (t != hotTool)
+        {
+            hotTool = t;
+            Invalidate();
+            if (t >= 0) tip.Show(L.T(t == 0 ? "Settings" : "Menu"), this, Point.Round(new PointF(tools[t].Left, tools[t].Bottom + Z(4))), 2500);
+            else tip.Hide(this);
+        }
+        Cursor = h >= 0 || t >= 0 || bells.Any(b => b.R.Contains(e.Location)) ? Cursors.Hand : Cursors.Default;
     }
 
     protected override void OnMouseLeave(EventArgs e)
     {
         base.OnMouseLeave(e);
-        hover = false; hot = -1;
+        hover = false; hot = -1; hotTool = -1;
         Invalidate();
     }
 

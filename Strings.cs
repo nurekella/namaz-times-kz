@@ -35,6 +35,7 @@ public static class L
         ["Holidays"] = ("Мерекелер", "Исламские праздники", "Islamic holidays"),
         ["Mute"] = ("Хабарламаларды өшіру", "Выключить уведомления", "Mute notifications"),
         ["Settings"] = ("Баптаулар", "Настройки", "Settings"),
+        ["Menu"] = ("Мәзір", "Меню", "Menu"),
         ["Exit"] = ("Шығу", "Выход", "Exit"),
         ["Update"] = ("Жаңарту: {0}", "Обновить до {0}", "Update to {0}"),
         ["UpdateAvail"] = ("Жаңа нұсқа бар: {0}", "Доступна новая версия {0}", "New version available: {0}"),
