@@ -10,6 +10,7 @@ static class Grid
             AllowUserToResizeRows = false, RowHeadersVisible = false, BorderStyle = BorderStyle.None,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ScrollBars = ScrollBars.Vertical,
+            AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells, // row height follows the font, so descenders aren't clipped
             BackgroundColor = Theme.Bg, GridColor = Theme.Line, EnableHeadersVisualStyles = false,
             CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
             ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
@@ -19,7 +20,7 @@ static class Grid
         g.DefaultCellStyle.ForeColor = Theme.Text;
         g.DefaultCellStyle.SelectionBackColor = Theme.Line;
         g.DefaultCellStyle.SelectionForeColor = Theme.Text;
-        g.DefaultCellStyle.Padding = new Padding(Theme.Dp(6), Theme.Dp(3), Theme.Dp(6), Theme.Dp(3));
+        g.DefaultCellStyle.Padding = new Padding(Theme.Dp(10), Theme.Dp(7), Theme.Dp(10), Theme.Dp(7));
         g.ColumnHeadersDefaultCellStyle.BackColor = Theme.Card;
         g.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Muted;
         g.ColumnHeadersDefaultCellStyle.SelectionBackColor = Theme.Card;
@@ -91,7 +92,7 @@ public class HolidaysForm : Form
         Theme.Apply(this);
         Text = L.T("Holidays");
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(Theme.Dp(820), Theme.Dp(480));
+        ClientSize = new Size(Theme.Dp(900), Theme.Dp(640));
         Padding = new Padding(Theme.Dp(12));
 
         var grid = Grid.Create();
@@ -99,9 +100,10 @@ public class HolidaysForm : Form
         grid.Columns.Add("d", L.T("Date"));
         grid.Columns.Add("h", L.T("HijriCol"));
         grid.Columns.Add("l", L.T("Left"));
-        grid.Columns[0].FillWeight = 160; grid.Columns[1].FillWeight = 300; grid.Columns[2].FillWeight = 170; grid.Columns[3].FillWeight = 70;
+        grid.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells; // full holiday name, never "…"
+        grid.Columns[1].FillWeight = 300; grid.Columns[2].FillWeight = 170; grid.Columns[3].FillWeight = 80;
         var note = Theme.Label(L.T("HolidayNote"), Theme.Muted, 8.5f);
-        note.Dock = DockStyle.Bottom; note.MaximumSize = new Size(Theme.Dp(796), 0); note.Margin = Padding.Empty;
+        note.Dock = DockStyle.Bottom; note.MaximumSize = new Size(Theme.Dp(876), 0); note.Margin = Padding.Empty;
         Controls.AddRange([grid, note]);
 
         var today = DateOnly.FromDateTime(DateTime.Today);
