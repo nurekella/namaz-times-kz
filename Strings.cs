@@ -72,6 +72,7 @@ public static class L
         ["FastAuto"] = ("Рамазанда", "В Рамадан", "In Ramadan"),
         ["FastAlways"] = ("Әрқашан", "Всегда", "Always"),
         ["FastOff"] = ("Жоқ", "Нет", "Off"),
+        ["WindowScale"] = ("Терезелер масштабы", "Масштаб окон", "Window scale"),
         ["TimeFormat"] = ("Уақыт форматы", "Формат времени", "Time format"),
         ["H24"] = ("24 сағат", "24 часа", "24-hour"),
         ["H12"] = ("12 сағат", "12 часов", "12-hour"),

@@ -51,7 +51,7 @@ public class TasbihForm : Form
             Margin = Padding.Empty, UseMnemonic = false,
         };
         var chips = new Segmented(Dhikr.All.Select(d => d.Translit), 0) { WrapContents = true, MaximumSize = new Size(w, 0), Anchor = AnchorStyles.None };
-        ar = Centered(new Font(Name99.ArabicFont, 24f), Theme.Text, 56);
+        ar = Centered(new Font(Name99.ArabicFont, 24f * Theme.UiScale), Theme.Text, 56);
         ar.RightToLeft = RightToLeft.Yes;
         translit = Centered(Theme.UI(12f, FontStyle.Bold), Theme.Text, 26);
         meaning = Centered(Theme.UI(9.5f), Theme.Muted, 40);

@@ -93,6 +93,7 @@ public class Widget : Form
     {
         L.Lang = s.Lang;
         L.Hour12 = s.Hour12;
+        Theme.UiScale = Math.Clamp(s.UiScale, 80, 160) / 100f;
         showItem.Text = L.T("ShowWidget");
         monthItem.Text = L.T("Month");
         holidaysItem.Text = L.T("Holidays");

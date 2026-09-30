@@ -135,7 +135,7 @@ public class NamesForm : Form
             if (isToday || Selected)
                 using (var p = new Pen(isToday ? Gold : Theme.Accent, Theme.Dp(1))) g.DrawPath(p, path);
             using var small = Theme.UI(8.5f);
-            using var ar = new Font(Name99.ArabicFont, 17f);
+            using var ar = new Font(Name99.ArabicFont, 17f * Theme.UiScale);
             using var tr = Theme.UI(9.5f, FontStyle.Bold);
             var label = isToday ? $"{Item.N} · {L.T("Today")}" : Item.N.ToString();
             TextRenderer.DrawText(g, label, small, new Point(Theme.Dp(8), Theme.Dp(5)), isToday ? Gold : Theme.Muted);
@@ -160,7 +160,7 @@ public class NamesForm : Form
             using var path = Theme.RoundRect(r, Theme.Dp(10));
             using (var b = new SolidBrush(Theme.Card)) g.FillPath(b, path);
             using (var p = new Pen(Color.FromArgb(110, Gold), Theme.Dp(1))) g.DrawPath(p, path);
-            using var ar = new Font(Name99.ArabicFont, 30f);
+            using var ar = new Font(Name99.ArabicFont, 30f * Theme.UiScale);
             using var tr = Theme.UI(14f, FontStyle.Bold);
             using var mean = Theme.UI(11f);
             using var small = Theme.UI(9f);

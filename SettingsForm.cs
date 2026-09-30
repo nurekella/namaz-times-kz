@@ -43,6 +43,8 @@ public class SettingsForm : Form
         Row(g1, L.T("FastTimes"), fasting);
         var hijri = new Stepper(s.HijriAdjust, -2, 2, 1, v => v > 0 ? $"+{v}" : v.ToString());
         Row(g1, L.T("HijriAdjust"), hijri);
+        var uiScale = new Stepper(s.UiScale, 80, 160, 10, v => v + "%");
+        Row(g1, L.T("WindowScale"), uiScale);
 
         // Notifications
         var notif = Theme.Section(L.T("Notifications"), out var g2);
@@ -114,6 +116,22 @@ public class SettingsForm : Form
         var root = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Padding = new Padding(Theme.Dp(16)) };
         root.Controls.Add(left); root.Controls.Add(right);
         root.Controls.Add(about); root.Controls.Add(buttons);
+
+        // Credit line, centred under everything.
+        var credit = new Control { Size = new Size(Theme.Dp(360), Theme.Dp(24)), Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(10), 0, 0) };
+        credit.Paint += (_, e) =>
+        {
+            const string text = "Made by Nurbol Khamzauly with ";
+            const TextFormatFlags flags = TextFormatFlags.NoPadding | TextFormatFlags.VerticalCenter;
+            using var font = Theme.UI(9f);
+            using var heartFont = new Font("Segoe UI Symbol", 10f * Theme.UiScale); // monochrome glyph, so it takes the red colour
+            int tw = TextRenderer.MeasureText(e.Graphics, text, font, Size.Empty, flags).Width;
+            int hw = TextRenderer.MeasureText(e.Graphics, "❤", heartFont, Size.Empty, flags).Width;
+            int x = (credit.Width - tw - hw) / 2;
+            TextRenderer.DrawText(e.Graphics, text, font, new Rectangle(x, 0, tw, credit.Height), Theme.Muted, flags);
+            TextRenderer.DrawText(e.Graphics, "❤", heartFont, new Rectangle(x + tw, 0, hw, credit.Height), Color.FromArgb(229, 57, 70), flags);
+        };
+        root.Controls.Add(credit); root.SetColumnSpan(credit, 2);
         Controls.Add(root);
 
         // Shown modeless, so DialogResult alone doesn't close the window.
@@ -127,6 +145,7 @@ public class SettingsForm : Form
             s.Hour12 = timeFormat.Selected == 1;
             s.Fasting = (FastingMode)fasting.Selected;
             s.HijriAdjust = hijri.Value;
+            s.UiScale = uiScale.Value;
             s.Muted = !notifyOn.Checked;
             s.RemindBefore = remind.Value;
             s.Jumuah = jumuah.Checked;

@@ -30,6 +30,7 @@ public class Settings
     public bool Jumuah { get; set; } = true;
     public int JumuahBefore { get; set; } = 60;
     public int Zoom { get; set; } = 100;
+    public int UiScale { get; set; } = 100;
     public int Opacity { get; set; } = 100;
     public int X { get; set; } = -1;
     public int Y { get; set; } = -1;

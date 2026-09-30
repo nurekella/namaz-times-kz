@@ -14,9 +14,11 @@ public static class Theme
     public static readonly Color Accent = Color.FromArgb(94, 196, 140);
 
     static readonly int Dpi = (int)Graphics.FromHwnd(IntPtr.Zero).DpiX;
-    public static int Dp(int v) => v * Dpi / 96;
+    /// Scale of all windows (Settings → General → Window scale); applied when a window is built.
+    public static float UiScale = 1f;
+    public static int Dp(int v) => (int)Math.Round(v * Dpi / 96f * UiScale);
 
-    public static Font UI(float size = 10f, FontStyle style = FontStyle.Regular) => new("Segoe UI", size, style);
+    public static Font UI(float size = 10f, FontStyle style = FontStyle.Regular) => new("Segoe UI", size * UiScale, style);
 
     public static Icon AppIcon(Size? size = null) =>
         new(typeof(Theme).Assembly.GetManifestResourceStream("app.ico")!, size ?? SystemInformation.IconSize);
