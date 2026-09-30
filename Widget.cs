@@ -40,14 +40,16 @@ public class Widget : Form
         Text = "Namaz Times KZ";
         Icon = Theme.AppIcon();
 
-        var menu = new ContextMenuStrip();
-        showItem = new ToolStripMenuItem("", null, (_, _) => SetWidgetVisible(!Visible));
-        monthItem = new ToolStripMenuItem("", null, (_, _) => Open(ref monthForm, () => new MonthForm(s)));
-        holidaysItem = new ToolStripMenuItem("", null, (_, _) => Open(ref holidaysForm, () => new HolidaysForm(s)));
-        muteItem = new ToolStripMenuItem("", null, (_, _) => { s.Muted = !s.Muted; Data.Save(s); Invalidate(); });
-        settingsItem = new ToolStripMenuItem("", null, (_, _) => OpenSettings());
-        updateItem = new ToolStripMenuItem("", null, (_, _) => Process.Start(new ProcessStartInfo(updateUrl!) { UseShellExecute = true })) { Visible = false };
-        exitItem = new ToolStripMenuItem("", null, (_, _) => { tray!.Visible = false; Application.Exit(); });
+        var menu = Theme.Menu();
+        // Glyphs (Segoe MDL2): View, Calendar, FavoriteStar, RingerSilent, Settings, Download, PowerButton
+        showItem = Theme.MenuItem('', (_, _) => SetWidgetVisible(!Visible));
+        monthItem = Theme.MenuItem('', (_, _) => Open(ref monthForm, () => new MonthForm(s)));
+        holidaysItem = Theme.MenuItem('', (_, _) => Open(ref holidaysForm, () => new HolidaysForm(s)));
+        muteItem = Theme.MenuItem('', (_, _) => { s.Muted = !s.Muted; Data.Save(s); Invalidate(); });
+        settingsItem = Theme.MenuItem('', (_, _) => OpenSettings());
+        updateItem = Theme.MenuItem('', (_, _) => Process.Start(new ProcessStartInfo(updateUrl!) { UseShellExecute = true }));
+        updateItem.Visible = false;
+        exitItem = Theme.MenuItem('', (_, _) => { tray!.Visible = false; Application.Exit(); });
         menu.Items.AddRange([showItem, monthItem, holidaysItem, new ToolStripSeparator(), muteItem, settingsItem, updateItem,
             new ToolStripSeparator(), exitItem]);
         menu.Opening += (_, _) => { showItem.Checked = Visible; muteItem.Checked = s.Muted; };
@@ -446,17 +448,19 @@ public class Widget : Form
         base.OnFormClosing(e);
     }
 
-    static void Open<T>(ref T? form, Func<T> make) where T : Form
+    // Windows opened from the widget must not end up behind it when the widget is "always on top".
+    void Open<T>(ref T? form, Func<T> make) where T : Form
     {
         if (form is { IsDisposed: false }) { form.Activate(); return; }
         form = make();
+        form.TopMost = TopMost;
         form.Show();
     }
 
     void OpenSettings()
     {
         if (settingsForm is { IsDisposed: false }) { settingsForm.Activate(); return; }
-        settingsForm = new SettingsForm(s);
+        settingsForm = new SettingsForm(s) { TopMost = TopMost };
         settingsForm.FormClosed += (_, _) =>
         {
             if (settingsForm.DialogResult != DialogResult.OK) return;

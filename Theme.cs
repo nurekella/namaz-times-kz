@@ -84,6 +84,101 @@ public static class Theme
     /// Windows 10/11 dark scrollbars for standard controls.
     public static void DarkScrollbars(Control c) => SetWindowTheme(c.Handle, "DarkMode_Explorer", null);
 
+    /// Dark context menu with rounded corners (Windows 11) and icon glyphs.
+    public static ContextMenuStrip Menu()
+    {
+        var m = new ContextMenuStrip
+        {
+            Renderer = new MenuRenderer(), Font = UI(10f), ShowCheckMargin = false, ShowImageMargin = true,
+            Padding = new Padding(Dp(4)), ImageScalingSize = new Size(Dp(18), Dp(18)),
+        };
+        m.HandleCreated += (_, _) =>
+        {
+            int round = 2; // DWMWCP_ROUND
+            DwmSetWindowAttribute(m.Handle, 33 /*DWMWA_WINDOW_CORNER_PREFERENCE*/, ref round, sizeof(int));
+        };
+        return m;
+    }
+
+    public static ToolStripMenuItem MenuItem(char glyph, EventHandler onClick) => new("", Glyph(glyph, Text), onClick)
+    {
+        Tag = glyph, Padding = new Padding(0, Dp(5), Dp(8), Dp(5)),
+    };
+
+    public static Bitmap Glyph(char glyph, Color color)
+    {
+        var size = Dp(18);
+        var bmp = new Bitmap(size, size);
+        using var g = Graphics.FromImage(bmp);
+        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit; // ClearType would fringe on transparent
+        using var f = new Font("Segoe MDL2 Assets", size * 0.62f, GraphicsUnit.Pixel);
+        using var b = new SolidBrush(color);
+        g.DrawString(glyph.ToString(), f, b, new RectangleF(0, 0, size, size),
+            new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
+        return bmp;
+    }
+
+    class MenuRenderer : ToolStripProfessionalRenderer
+    {
+
+        protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e) => e.Graphics.Clear(Card);
+
+        protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
+        {
+            using var pen = new Pen(Line);
+            e.Graphics.DrawRectangle(pen, 0, 0, e.ToolStrip.Width - 1, e.ToolStrip.Height - 1);
+        }
+
+        protected override void OnRenderImageMargin(ToolStripRenderEventArgs e) { }
+
+        protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
+        {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            if (e.Item.Selected && e.Item.Enabled)
+            {
+                using var path = RoundRect(new RectangleF(Dp(2), 1, e.Item.Width - Dp(4), e.Item.Height - 2), Dp(5));
+                using var b = new SolidBrush(Line);
+                e.Graphics.FillPath(b, path);
+            }
+        }
+
+        // Checked items ("show widget", "mute") get a green icon on a soft green chip instead of the default blue box.
+        protected override void OnRenderItemImage(ToolStripItemImageRenderEventArgs e)
+        {
+            if (e.Image == null) return;
+            if (e.Item is ToolStripMenuItem { Checked: true, Tag: char glyph })
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                var r = RectangleF.Inflate(e.ImageRectangle, Dp(4), Dp(4));
+                using var chip = RoundRect(r, Dp(5));
+                using var b = new SolidBrush(Color.FromArgb(55, Accent));
+                e.Graphics.FillPath(b, chip);
+                e.Graphics.DrawImage(Checked.TryGetValue(glyph, out var img) ? img : Checked[glyph] = Glyph(glyph, Accent), e.ImageRectangle);
+            }
+            else e.Graphics.DrawImage(e.Image, e.ImageRectangle);
+        }
+
+        static readonly Dictionary<char, Bitmap> Checked = [];
+
+        protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+        {
+            e.TextColor = e.Item.Enabled ? Text : Muted;
+            base.OnRenderItemText(e);
+        }
+
+        protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
+        {
+            // Suppress the default check box; OnRenderItemImage marks checked items.
+        }
+
+        protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
+        {
+            using var pen = new Pen(Line);
+            var y = e.Item.Height / 2;
+            e.Graphics.DrawLine(pen, Dp(10), y, e.Item.Width - Dp(10), y);
+        }
+    }
+
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr h, int attr, ref int value, int size);
     [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)] static extern int SetWindowTheme(IntPtr h, string? app, string? idList);
 }
