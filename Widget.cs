@@ -201,6 +201,13 @@ public class Widget : Form
             : new Point(wa.Right - Width - Zi(16), wa.Top + Zi(16));
     }
 
+    /// Shown again when the app is launched while already running (e.g. from the Start menu).
+    public void BringBack()
+    {
+        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        SetWidgetVisible(true);
+    }
+
     void SetWidgetVisible(bool v)
     {
         s.WidgetVisible = v; Data.Save(s);

@@ -181,11 +181,14 @@ static class Program
     {
         if (args.Contains("--selftest")) return SelfTest();
 
-        using var mutex = new Mutex(true, "NamazTimes.SingleInstance", out var first);
-        if (!first) return 0;
+        // Single instance: a second launch just asks the running one to show its widget.
+        using var showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, "NamazTimes.Show", out var first);
+        if (!first) { showSignal.Set(); return 0; }
 
         ApplicationConfiguration.Initialize();
         var widget = new Widget(Data.LoadSettings());
+        _ = widget.Handle; // needed for BeginInvoke even while the widget starts hidden
+        new Thread(() => { while (showSignal.WaitOne()) widget.BeginInvoke(widget.BringBack); }) { IsBackground = true }.Start();
         if (args.Contains("--test-alert")) // show a sample notification shortly after start
             widget.Load += async (_, _) => { await Task.Delay(1500); widget.TestAlert(); };
         Application.Run(widget);
