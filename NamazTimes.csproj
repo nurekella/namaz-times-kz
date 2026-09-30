@@ -8,13 +8,22 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>NamazTimes</AssemblyName>
     <Product>Namaz Times KZ</Product>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- No designer in this project; controls are built in code. -->
+    <NoWarn>$(NoWarn);WFO1000</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="app.ico" LogicalName="app.ico" />
+    <EmbeddedResource Include="cities.json" LogicalName="cities.json" />
+    <!-- CI passes -p:GitHubRepo=owner/name so the app can check Releases for updates. -->
+    <AssemblyMetadata Include="GitHubRepo" Value="$(GitHubRepo)" Condition="'$(GitHubRepo)' != ''" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="installer/**" />
   </ItemGroup>
 
 </Project>

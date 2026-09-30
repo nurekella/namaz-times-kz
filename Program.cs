@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -11,11 +10,18 @@ public record City(string Title, string Lat, string Lng);
 
 public class Settings
 {
-    public City City { get; set; } = new("Алматы", "43.238293", "76.945465");
+    public City City { get; set; } = new("Алматы қаласы", "43.238293", "76.945465");
     public string Lang { get; set; } = L.Default();
+    public bool Hanafi { get; set; } = true;
+    public Dictionary<P, int> Offsets { get; set; } = [];
+    public int HijriAdjust { get; set; }
     public HashSet<P> Hidden { get; set; } = [];
     public HashSet<P> Alerts { get; set; } = [P.Fajr, P.Dhuhr, P.Asr, P.Maghrib, P.Isha];
+    public bool Muted { get; set; }
     public int RemindBefore { get; set; }
+    public bool Jumuah { get; set; } = true;
+    public int JumuahBefore { get; set; } = 60;
+    public int Zoom { get; set; } = 100;
     public int Opacity { get; set; } = 100;
     public int X { get; set; } = -1;
     public int Y { get; set; } = -1;
@@ -95,44 +101,72 @@ public static class Data
 
     static DateTime CeilMinute(DateTime t) => new((t.Ticks + TimeSpan.TicksPerMinute - 1) / TimeSpan.TicksPerMinute * TimeSpan.TicksPerMinute);
 
-    /// All times of a calendar day in order. Tahajjud = start of the last third of the night
-    /// that ends at this day's Fajr (previous Maghrib → Fajr).
-    public static List<(P P, DateTime At)>? Times(DateOnly date, Func<DateOnly, Day?> getDay)
+    /// ДУМК publishes Hanafi Asr (shadow = 2× object + noon shadow). Other madhabs use 1×.
+    /// We subtract the astronomical gap between the two so ДУМК's own precautionary minutes are kept.
+    public static TimeSpan AsrGap(DateOnly date, double latDeg)
+    {
+        static double R(double deg) => deg * Math.PI / 180;
+        var n = (date.ToDateTime(new TimeOnly(7, 0)) - new DateTime(2000, 1, 1, 12, 0, 0)).TotalDays; // ≈ local noon, UTC+5
+        var g = R(357.529 + 0.98560028 * n);
+        var lon = R(280.459 + 0.98564736 * n + 1.915 * Math.Sin(g) + 0.020 * Math.Sin(2 * g));
+        var decl = Math.Asin(Math.Sin(R(23.439 - 0.00000036 * n)) * Math.Sin(lon));
+        var phi = R(latDeg);
+        double HourAngle(double shadow)
+        {
+            var alt = Math.Atan(1 / (shadow + Math.Tan(Math.Abs(phi - decl))));
+            return Math.Acos((Math.Sin(alt) - Math.Sin(phi) * Math.Sin(decl)) / (Math.Cos(phi) * Math.Cos(decl)));
+        }
+        return TimeSpan.FromHours((HourAngle(2) - HourAngle(1)) * 180 / Math.PI / 15);
+    }
+
+    /// All times of a calendar day in order, with madhab and manual offsets applied.
+    /// Tahajjud = start of the last third of the night that ends at this day's Fajr.
+    public static List<(P P, DateTime At)>? Times(DateOnly date, Func<DateOnly, Day?> getDay, Settings? s = null)
     {
         if (getDay(date) is not { } d) return null;
-        var fajr = At(date, d.Fajr);
-        var sunrise = At(date, d.Sunrise);
+        TimeSpan Off(P p) => TimeSpan.FromMinutes(s?.Offsets.GetValueOrDefault(p) ?? 0);
+        var fajr = At(date, d.Fajr) + Off(P.Fajr);
+        var sunrise = At(date, d.Sunrise) + Off(P.Sunrise);
+        var asr = At(date, d.Asr) + Off(P.Asr);
+        if (s is { Hanafi: false } && double.TryParse(s.City.Lat, System.Globalization.CultureInfo.InvariantCulture, out var lat))
+            asr = CeilMinute(asr - AsrGap(date, lat));
         var list = new List<(P, DateTime)>();
-        if (getDay(date.AddDays(-1)) is { } y && At(date.AddDays(-1), y.Maghrib) is var m)
-            list.Add((P.Tahajjud, CeilMinute(m + (fajr - m) * 2 / 3)));
+        if (getDay(date.AddDays(-1)) is { } y && At(date.AddDays(-1), y.Maghrib) + Off(P.Maghrib) is var m)
+            list.Add((P.Tahajjud, CeilMinute(m + (fajr - m) * 2 / 3) + Off(P.Tahajjud)));
         list.AddRange([
-            (P.Fajr, fajr), (P.Sunrise, sunrise), (P.Duha, sunrise + DuhaAfterSunrise),
-            (P.Dhuhr, At(date, d.Dhuhr)), (P.Asr, At(date, d.Asr)), (P.Maghrib, At(date, d.Maghrib)), (P.Isha, At(date, d.Isha)),
+            (P.Fajr, fajr), (P.Sunrise, sunrise), (P.Duha, sunrise + DuhaAfterSunrise + Off(P.Duha)),
+            (P.Dhuhr, At(date, d.Dhuhr) + Off(P.Dhuhr)), (P.Asr, asr),
+            (P.Maghrib, At(date, d.Maghrib) + Off(P.Maghrib)), (P.Isha, At(date, d.Isha) + Off(P.Isha)),
         ]);
         return list;
     }
 
     /// First time strictly after `now` among shown prayers, looking into tomorrow if needed.
-    public static (P P, DateTime At)? Next(DateTime now, Func<DateOnly, Day?> getDay, Func<P, bool> shown)
+    public static (P P, DateTime At)? Next(DateTime now, Func<DateOnly, Day?> getDay, Func<P, bool> shown, Settings? s = null)
     {
         var today = DateOnly.FromDateTime(now);
         foreach (var date in new[] { today, today.AddDays(1) })
-            foreach (var x in Times(date, getDay) ?? [])
+            foreach (var x in Times(date, getDay, s) ?? [])
                 if (x.At > now && shown(x.P)) return x;
         return null;
     }
 
-    public static async Task<List<(string Title, City City)>> SearchCities(string q)
+    /// Snapshot of api.muftyat.kz/cities (5694 places), embedded so the list works offline and instantly.
+    /// Rows: [title, region, district, lat, lng]. Regenerate with tools/cities.mjs.
+    public static readonly Lazy<List<string[]>> Cities = new(() =>
+        JsonSerializer.Deserialize<List<string[]>>(typeof(Data).Assembly.GetManifestResourceStream("cities.json")!)!);
+
+    /// Lowercase + fold Kazakh letters to Russian ones so "караганда" finds "Қарағанды".
+    public static string Fold(string s)
     {
-        var res = await Http.GetFromJsonAsync<JsonElement>($"cities/?search={Uri.EscapeDataString(q)}");
-        return res.GetProperty("results").EnumerateArray().Select(e =>
-        {
-            var title = e.GetProperty("title").GetString()!;
-            var region = e.GetProperty("region").GetString();
-            var district = e.TryGetProperty("district", out var dd) ? dd.GetString() : null;
-            var label = string.Join(", ", new[] { title, district, region }.Where(s => !string.IsNullOrEmpty(s)));
-            return (label, new City(title, e.GetProperty("lat").GetString()!, e.GetProperty("lng").GetString()!));
-        }).ToList();
+        var chars = s.ToLowerInvariant().ToCharArray();
+        for (int i = 0; i < chars.Length; i++)
+            chars[i] = chars[i] switch
+            {
+                'қ' => 'к', 'ғ' => 'г', 'ә' => 'а', 'ө' => 'о', 'ү' or 'ұ' => 'у', 'һ' => 'х', 'і' => 'и', 'ң' => 'н', 'ё' => 'е',
+                var c => c,
+            };
+        return new string(chars);
     }
 }
 
@@ -167,6 +201,18 @@ static class Program
         Trace.Assert(Data.Next(T(20, 0), Get, All) == (P.Tahajjud, T(1, 20, 1)), "rolls to tomorrow");
         Trace.Assert(Data.Next(T(20, 0), Get, p => p != P.Tahajjud) == (P.Fajr, T(5, 0, 1)), "hidden skipped");
         Trace.Assert(Data.Next(T(20, 0), _ => null, All) == null);
+
+        var s = new Settings { Offsets = { [P.Fajr] = 5 } };
+        Trace.Assert(Data.Times(day, Get, s)![1] == (P.Fajr, T(5, 5)), "manual offset");
+
+        // Almaty, 30 Sep: Hanafi Asr ≈ 15:48, standard ≈ 15:00 → gap ≈ 48 min.
+        var gap = Data.AsrGap(new DateOnly(2026, 9, 30), 43.238).TotalMinutes;
+        Trace.Assert(gap is > 44 and < 52, $"asr gap {gap}");
+        Trace.Assert(Data.Fold("Қарағанды") == "караганды");
+
+        var h = Hijri.Of(new DateOnly(2026, 3, 20), 0); // Eid al-Fitr 1447 per Umm al-Qura
+        Trace.Assert(h == (1447, 10, 1), $"hijri {h}");
+        Trace.Assert(Hijri.ToGregorian(1447, 10, 1, 0) == new DateOnly(2026, 3, 20));
         Console.WriteLine("selftest ok");
         return 0;
     }

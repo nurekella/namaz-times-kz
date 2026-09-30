@@ -4,132 +4,194 @@ public class SettingsForm : Form
 {
     public SettingsForm(Settings s)
     {
-        Text = "Namaz Times KZ — " + L.T("Settings").TrimEnd('…');
-        Icon = new(typeof(Widget).Assembly.GetManifestResourceStream("app.ico")!);
+        Theme.Apply(this);
+        Text = "Namaz Times KZ — " + L.T("Settings");
         StartPosition = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = MinimizeBox = false;
+        FormBorderStyle = FormBorderStyle.FixedSingle;
+        MaximizeBox = false;
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        Font = new Font("Segoe UI", 10f);
 
-        var grid = new TableLayoutPanel { AutoSize = true, ColumnCount = 3, Padding = new Padding(12), Dock = DockStyle.Fill };
-        Label Lbl(string text, bool bold = false) => new()
+        static void Row(TableLayoutPanel g, string label, Control c)
         {
-            Text = text, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(3, 6, 12, 6),
-            Font = bold ? new Font(Font, FontStyle.Bold) : Font,
-        };
-        void Row(Control a, Control? b = null, int span = 1)
-        {
-            grid.Controls.Add(a);
-            if (b != null) { grid.Controls.Add(b); grid.SetColumnSpan(b, span); }
+            c.Anchor = AnchorStyles.Left;
+            g.Controls.Add(Theme.Label(label));
+            g.Controls.Add(c);
         }
 
-        var lang = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
-        lang.Items.AddRange(L.Languages.Select(l => l.Name).ToArray<object>());
-        lang.SelectedIndex = Math.Max(0, Array.FindIndex(L.Languages, l => l.Code == s.Lang));
-        Row(Lbl(L.T("Language")), lang, 2);
-
+        // General
+        var general = Theme.Section(L.T("General"), out var g1);
+        var lang = new Segmented(L.Languages.Select(l => l.Name), Array.FindIndex(L.Languages, l => l.Code == s.Lang));
+        Row(g1, L.T("Language"), lang);
         var city = s.City;
-        var cityBtn = new Button { Text = $"{city.Title} — {L.T("Change")}", AutoSize = true };
+        var cityBtn = Theme.Button(city.Title + "  ›");
         cityBtn.Click += (_, _) =>
         {
             using var f = new CityPicker();
             if (f.ShowDialog(this) == DialogResult.OK && f.Selected != null)
             {
                 city = f.Selected;
-                cityBtn.Text = $"{city.Title} — {L.T("Change")}";
+                cityBtn.Text = city.Title + "  ›";
             }
         };
-        Row(Lbl(L.T("City")), cityBtn, 2);
+        Row(g1, L.T("City"), cityBtn);
+        var madhab = new Segmented([L.T("Hanafi"), L.T("OtherMadhabs")], s.Hanafi ? 0 : 1);
+        Row(g1, L.T("AsrMethod"), madhab);
+        var hijri = new Stepper(s.HijriAdjust, -2, 2, 1, v => v > 0 ? $"+{v}" : v.ToString());
+        Row(g1, L.T("HijriAdjust"), hijri);
 
-        Row(Lbl(L.T("Prayer"), true));
-        Row(Lbl(L.T("Show"), true));
-        Row(Lbl(L.T("Notify"), true));
-        var checks = Enum.GetValues<P>().Select(p =>
+        // Notifications
+        var notif = Theme.Section(L.T("Notifications"), out var g2);
+        var notifyOn = new Toggle(!s.Muted);
+        Row(g2, L.T("NotifyOn"), notifyOn);
+        string MinOrOff(int v) => v == 0 ? L.T("Off") : string.Format(L.T("Min"), v);
+        var remind = new Stepper(s.RemindBefore, 0, 60, 5, MinOrOff);
+        Row(g2, L.T("RemindBefore"), remind);
+        var jumuah = new Toggle(s.Jumuah);
+        var jumuahMin = new Stepper(s.JumuahBefore, 15, 180, 15, MinOrOff);
+        var jumuahRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        jumuahRow.Controls.AddRange([jumuah, jumuahMin]);
+        Row(g2, L.T("JumuahRemind"), jumuahRow);
+
+        // Widget
+        var widget = Theme.Section(L.T("Widget"), out var g3);
+        var zoom = new Stepper(s.Zoom, 70, 250, 10, v => v + "%");
+        Row(g3, L.T("Size"), zoom);
+        var opacity = new Stepper(s.Opacity, 30, 100, 10, v => v + "%");
+        Row(g3, L.T("Opacity"), opacity);
+        var topMost = new Toggle(s.TopMost);
+        Row(g3, L.T("TopMost"), topMost);
+        var autoStart = new Toggle(Widget.AutoStart);
+        Row(g3, L.T("AutoStart"), autoStart);
+        var hint = Theme.Label(L.T("ResizeHint"), Theme.Muted, 8.5f);
+        g3.Controls.Add(hint); g3.SetColumnSpan(hint, 2);
+
+        // Prayers: name | show | notify | offset
+        var prayers = Theme.Section(L.T("Prayers"), out var g4, 4);
+        foreach (var h in new[] { "", L.T("Show"), L.T("Notify"), L.T("Offset") })
         {
-            var show = new CheckBox { Checked = !s.Hidden.Contains(p), AutoSize = true, Anchor = AnchorStyles.None };
-            var notify = new CheckBox { Checked = s.Alerts.Contains(p), AutoSize = true, Anchor = AnchorStyles.None };
-            Row(Lbl(L.Name(p)), show);
-            grid.Controls.Add(notify);
-            return (p, show, notify);
+            var l = Theme.Label(h, Theme.Muted, 8.5f);
+            l.Anchor = h == "" ? AnchorStyles.Left : AnchorStyles.None;
+            g4.Controls.Add(l);
+        }
+        var rows = Enum.GetValues<P>().Select(p =>
+        {
+            var show = new Toggle(!s.Hidden.Contains(p));
+            var notify = new Toggle(s.Alerts.Contains(p));
+            var off = new Stepper(s.Offsets.GetValueOrDefault(p), -30, 30, 1, v => v > 0 ? $"+{v}" : v.ToString());
+            g4.Controls.Add(Theme.Label(L.Name(p)));
+            g4.Controls.AddRange([show, notify, off]);
+            return (p, show, notify, off);
         }).ToList();
 
-        var remind = new NumericUpDown { Minimum = 0, Maximum = 120, Value = Math.Clamp(s.RemindBefore, 0, 120), Width = 70 };
-        Row(Lbl(L.T("RemindBefore")), remind, 2);
+        // Layout: two columns of cards + footer
+        var left = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Margin = new Padding(0, 0, Theme.Dp(12), 0) };
+        left.Controls.AddRange([general, notif, widget]);
+        var right = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
+        right.Controls.Add(prayers);
 
-        var opacity = new TrackBar { Minimum = 30, Maximum = 100, TickFrequency = 10, Value = Math.Clamp(s.Opacity, 30, 100), Width = 160, AutoSize = false, Height = 32 };
-        Row(Lbl(L.T("Opacity")), opacity, 2);
-
-        var topMost = new CheckBox { Text = L.T("TopMost"), Checked = s.TopMost, AutoSize = true };
-        Row(topMost); grid.SetColumnSpan(topMost, 3);
-        var autoStart = new CheckBox { Text = L.T("AutoStart"), Checked = Widget.AutoStart, AutoSize = true };
-        Row(autoStart); grid.SetColumnSpan(autoStart, 3);
-
-        var save = new Button { Text = L.T("Save"), AutoSize = true, DialogResult = DialogResult.OK };
-        var cancel = new Button { Text = L.T("Cancel"), AutoSize = true, DialogResult = DialogResult.Cancel };
-        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 12, 0, 0) };
-        buttons.Controls.AddRange([cancel, save]);
-        Row(buttons); grid.SetColumnSpan(buttons, 3);
+        var save = Theme.Button(L.T("Save"), primary: true);
+        var cancel = Theme.Button(L.T("Cancel"));
+        save.DialogResult = DialogResult.OK; cancel.DialogResult = DialogResult.Cancel;
         AcceptButton = save; CancelButton = cancel;
+        var buttons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Right, Margin = Padding.Empty };
+        buttons.Controls.AddRange([cancel, save]);
+        var version = Theme.Label($"v{Updates.Current.ToString(3)} · muftyat.kz", Theme.Muted, 8.5f);
+
+        var root = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Padding = new Padding(Theme.Dp(16)) };
+        root.Controls.Add(left); root.Controls.Add(right);
+        root.Controls.Add(version); root.Controls.Add(buttons);
+        Controls.Add(root);
 
         save.Click += (_, _) =>
         {
-            s.Lang = L.Languages[lang.SelectedIndex].Code;
+            s.Lang = L.Languages[lang.Selected].Code;
             s.City = city;
-            s.Hidden = checks.Where(c => !c.show.Checked).Select(c => c.p).ToHashSet();
-            s.Alerts = checks.Where(c => c.notify.Checked).Select(c => c.p).ToHashSet();
-            s.RemindBefore = (int)remind.Value;
+            s.Hanafi = madhab.Selected == 0;
+            s.HijriAdjust = hijri.Value;
+            s.Muted = !notifyOn.Checked;
+            s.RemindBefore = remind.Value;
+            s.Jumuah = jumuah.Checked;
+            s.JumuahBefore = jumuahMin.Value;
+            s.Zoom = zoom.Value;
             s.Opacity = opacity.Value;
             s.TopMost = topMost.Checked;
+            s.Hidden = rows.Where(r => !r.show.Checked).Select(r => r.p).ToHashSet();
+            s.Alerts = rows.Where(r => r.notify.Checked).Select(r => r.p).ToHashSet();
+            s.Offsets = rows.Where(r => r.off.Value != 0).ToDictionary(r => r.p, r => r.off.Value);
             if (autoStart.Checked != Widget.AutoStart) Widget.AutoStart = autoStart.Checked;
         };
-
-        Controls.Add(grid);
     }
 }
 
 public class CityPicker : Form
 {
     public City? Selected { get; private set; }
-    readonly TextBox query = new() { Dock = DockStyle.Fill, PlaceholderText = L.T("SearchHint") };
-    readonly ListBox list = new() { Dock = DockStyle.Fill, IntegralHeight = false };
-    List<(string Title, City City)> found = [];
 
     public CityPicker()
     {
+        Theme.Apply(this);
         Text = L.T("ChooseCity");
         StartPosition = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
+        FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(440, 360);
-        Font = new Font("Segoe UI", 10f);
-        var search = new Button { Text = L.T("Search"), Dock = DockStyle.Right, Width = 90 };
-        var top = new Panel { Dock = DockStyle.Top, Height = 34, Padding = new Padding(8, 6, 8, 0) };
-        top.Controls.Add(query); top.Controls.Add(search);
-        var body = new Panel { Dock = DockStyle.Fill, Padding = new Padding(8) };
-        body.Controls.Add(list);
-        Controls.Add(body); Controls.Add(top);
-        AcceptButton = search;
+        ClientSize = new Size(Theme.Dp(520), Theme.Dp(520));
+        Padding = new Padding(Theme.Dp(12));
 
-        search.Click += async (_, _) =>
+        var query = new TextBox
         {
-            if (query.Text.Trim().Length < 2) return;
-            search.Enabled = false;
-            try
-            {
-                found = await Data.SearchCities(query.Text.Trim());
-                list.DataSource = found.Count > 0 ? found.Select(f => f.Title).ToList() : [L.T("NotFound")];
-            }
-            catch { MessageBox.Show(this, L.T("NetError"), Text); }
-            finally { search.Enabled = true; }
+            Dock = DockStyle.Top, PlaceholderText = L.T("SearchHint"), BackColor = Theme.Card, ForeColor = Theme.Text,
+            BorderStyle = BorderStyle.FixedSingle, Font = Theme.UI(11f),
         };
-        list.DoubleClick += (_, _) =>
+        var list = new ListBox
         {
-            if (list.SelectedIndex < 0 || list.SelectedIndex >= found.Count) return;
-            Selected = found[list.SelectedIndex].City;
+            Dock = DockStyle.Fill, IntegralHeight = false, BackColor = Theme.Card, ForeColor = Theme.Text,
+            BorderStyle = BorderStyle.None, Font = Theme.UI(10f),
+        };
+        list.HandleCreated += (_, _) => Theme.DarkScrollbars(list);
+        var choose = Theme.Button(L.T("Choose"), primary: true);
+        var cancel = Theme.Button(L.T("Cancel"));
+        cancel.DialogResult = DialogResult.Cancel; CancelButton = cancel; AcceptButton = choose;
+        var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, Theme.Dp(8), 0, 0) };
+        buttons.Controls.AddRange([cancel, choose]);
+        var gap = new Panel { Dock = DockStyle.Top, Height = Theme.Dp(8) };
+        Controls.AddRange([list, gap, query, buttons]);
+
+        var all = Data.Cities.Value
+            .Select(c => (Label: string.Join(" · ", new[] { c[0], c[2], c[1] }.Where(x => x != "")), Key: Data.Fold(c[0]), Row: c))
+            .ToList();
+        List<string[]> shown = [];
+        void Filter()
+        {
+            var q = Data.Fold(query.Text.Trim());
+            var hits = q == "" ? all : all.Where(c => c.Key.Contains(q)).OrderBy(c => !c.Key.StartsWith(q)).ToList();
+            shown = hits.Select(h => h.Row).ToList();
+            list.BeginUpdate();
+            list.Items.Clear();
+            list.Items.AddRange(hits.Select(h => (object)h.Label).ToArray());
+            if (list.Items.Count > 0) list.SelectedIndex = 0;
+            list.EndUpdate();
+        }
+        void Pick()
+        {
+            if (list.SelectedIndex < 0) return;
+            var r = shown[list.SelectedIndex];
+            Selected = new City(r[0], r[3], r[4]);
             DialogResult = DialogResult.OK;
+        }
+        query.TextChanged += (_, _) => Filter();
+        query.KeyDown += (_, e) =>
+        {
+            if (e.KeyCode is Keys.Down or Keys.Up && list.Items.Count > 0)
+            {
+                list.SelectedIndex = Math.Clamp(list.SelectedIndex + (e.KeyCode == Keys.Down ? 1 : -1), 0, list.Items.Count - 1);
+                e.Handled = true;
+            }
         };
+        list.DoubleClick += (_, _) => Pick();
+        choose.Click += (_, _) => Pick();
+        Shown += (_, _) => query.Focus();
+        Filter();
     }
 }

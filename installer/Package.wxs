@@ -1,0 +1,22 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="Namaz Times KZ" Manufacturer="Namaz Times KZ" Version="$(ProductVersion)"
+           UpgradeCode="24068D67-49F7-4CBC-8F3E-3C3EF2966F67" Scope="perMachine">
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Namaz Times KZ is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="app.ico" SourceFile="..\app.ico" />
+    <Property Id="ARPPRODUCTICON" Value="app.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="https://muftyat.kz" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Namaz Times KZ">
+        <Component>
+          <File Source="$(ExePath)" KeyPath="yes">
+            <Shortcut Name="Namaz Times KZ" Directory="ProgramMenuFolder" Advertise="yes"
+                      Icon="app.ico" WorkingDirectory="INSTALLFOLDER" />
+          </File>
+        </Component>
+      </Directory>
+    </StandardDirectory>
+  </Package>
+</Wix>

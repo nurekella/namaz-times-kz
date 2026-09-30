@@ -1,0 +1,10 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+  <!-- Build: dotnet build installer -p:ProductVersion=1.2.3 -p:ExePath=path\to\NamazTimes.exe -->
+  <PropertyGroup>
+    <ProductVersion Condition="'$(ProductVersion)' == ''">0.0.1</ProductVersion>
+    <ExePath Condition="'$(ExePath)' == ''">..\out\NamazTimes.exe</ExePath>
+    <OutputName>NamazTimes-$(ProductVersion)</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <DefineConstants>ProductVersion=$(ProductVersion);ExePath=$(ExePath)</DefineConstants>
+  </PropertyGroup>
+</Project>
