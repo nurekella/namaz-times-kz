@@ -118,7 +118,8 @@ public class Widget : Form
 
     int HeaderLines => 3 + (holiday != null ? 1 : 0);
     int CardHeight => 6 + Math.Max(rows.Sum(r => r.H), 60) + 4 + 38;
-    int ContentHeight => 10 + HeaderLines * 19 + 8 + CardHeight + 12; // at 96 dpi, zoom 100
+    const int TopStrip = 24; // free space above the header for the minimize/fullscreen/close buttons
+    int ContentHeight => TopStrip + 6 + HeaderLines * 19 + 8 + CardHeight + 12; // at 96 dpi, zoom 100
     Size SizeFor() => new(Zi(BaseWidth), Zi(ContentHeight));
 
     void Relayout()
@@ -272,8 +273,8 @@ public class Widget : Form
         float left = ox + Z(14), right = ox + cw - Z(14);
 
         // Header: clock on the left; location, dates and holiday right-aligned.
-        TextRenderer.DrawText(g, now.ToString("HH:mm"), clock, new Point((int)left - Zi(2), oy + Zi(6)), Color.White);
-        float y = oy + Z(10);
+        TextRenderer.DrawText(g, now.ToString("HH:mm"), clock, new Point((int)left - Zi(2), oy + Zi(TopStrip + 2)), Color.White);
+        float y = oy + Z(TopStrip + 6);
         var city = s.City.Title + (s.Muted ? " 🔕" : "");
         var cityW = TextRenderer.MeasureText(g, city, head, Size.Empty, TextFormatFlags.NoPadding).Width;
         TextRenderer.DrawText(g, city, head, Rectangle.Round(new RectangleF(left, y, right - left, Z(19))), Color.White, Right | TextFormatFlags.EndEllipsis);
