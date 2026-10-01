@@ -275,6 +275,7 @@ static class Program
         var h = Hijri.Of(new DateOnly(2026, 3, 20), 0); // Eid al-Fitr 1447 per Umm al-Qura
         Trace.Assert(h == (1447, 10, 1), $"hijri {h}");
         Trace.Assert(Hijri.ToGregorian(1447, 10, 1, 0) == new DateOnly(2026, 3, 20));
+        Trace.Assert(new Settings().Lang == "kk", "Kazakh is the default language");
         Trace.Assert(Hijri.SunnahFast(new DateOnly(2026, 3, 20), 0) == null, "Eid al-Fitr: fasting forbidden");
         Trace.Assert(Hijri.SunnahFast(Hijri.ToGregorian(1447, 12, 9, 0), 0) == "FastArafa");
         Trace.Assert(Hijri.SunnahFast(Hijri.ToGregorian(1447, 12, 10, 0), 0) == null, "Eid al-Adha");

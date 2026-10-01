@@ -4,12 +4,12 @@ namespace NamazTimes;
 
 public static class L
 {
-    public static string Lang = "ru";
+    public static string Lang = "kk";
 
     public static readonly (string Code, string Name)[] Languages = [("kk", "Қазақша"), ("ru", "Русский"), ("en", "English")];
 
-    public static string Default() =>
-        CultureInfo.CurrentUICulture.TwoLetterISOLanguageName switch { "kk" => "kk", "en" => "en", _ => "ru" };
+    /// Kazakh by default for new installs; anyone can switch in Settings, and a saved choice is always kept.
+    public static string Default() => "kk";
 
     public static CultureInfo Culture => CultureInfo.GetCultureInfo(Lang switch { "kk" => "kk-KZ", "en" => "en-US", _ => "ru-RU" });
 
