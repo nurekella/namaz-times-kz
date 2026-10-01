@@ -74,6 +74,7 @@ public static class L
         ["UnitDays"] = ("күн", "дней", "days"),
         ["UnitMonths"] = ("ай", "месяцев", "months"),
         ["UnitYears"] = ("жыл", "лет", "years"),
+        ["TargetCustom"] = ("Өзім", "Своё", "Custom"),
         ["TargetRecommended"] = ("Ұсынылған", "Рекоменд.", "Suggested"),
         ["RecommendedTimes"] = ("ұсынылады: {0} рет", "рекомендуется: {0} раз", "suggested: {0} times"),
         // morning / evening adhkar

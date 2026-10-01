@@ -22,8 +22,8 @@ public record Dhikr(string Ar, int Recommended, JsonElement Json)
 /// Digital prayer beads. Counts per dhikr are kept for the current day in settings.
 public class TasbihForm : Form
 {
-    const int Recommended = -1; // target = the selected dhikr's recommended count
-    static readonly int[] Targets = [Recommended, 33, 99, 100, 0]; // 0 = no limit
+    const int Recommended = -1, Custom = -2; // target = the dhikr's recommended count / the user's own number
+    static readonly int[] Targets = [Recommended, 33, 99, 100, 0, Custom]; // 0 = no limit
     readonly Settings s;
     readonly ListBox list;
     readonly Label ar, translit, meaning, virtue, total, hint;
@@ -82,12 +82,20 @@ public class TasbihForm : Form
         ring = new Ring(this) { Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(6), 0, Theme.Dp(2)) };
         hint = Block(Theme.UI(8.5f), Theme.Muted, 26);
 
-        var target = new Segmented(Targets.Select(t => t switch { Recommended => L.T("TargetRecommended"), 0 => "∞", _ => t.ToString() }),
+        var target = new Segmented(Targets.Select(t => t switch { Recommended => L.T("TargetRecommended"), Custom => L.T("TargetCustom"), 0 => "∞", _ => t.ToString() }),
             Math.Max(0, Array.IndexOf(Targets, s.TasbihTarget)));
         var reset = Theme.Button("↺");
         var targetRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(4), 0, Theme.Dp(6)) };
         target.Margin = new Padding(0, 0, Theme.Dp(8), 0);
-        targetRow.Controls.AddRange([target, reset]);
+        // Own number: shown only while "Custom" is selected
+        var custom = new NumericUpDown
+        {
+            Minimum = 1, Maximum = 100_000, Value = Math.Clamp(s.TasbihCustom, 1, 100_000), Width = Theme.Dp(84), Font = Theme.UI(11f),
+            BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, TextAlign = HorizontalAlignment.Center,
+            Margin = new Padding(0, Theme.Dp(3), Theme.Dp(8), 0), Visible = s.TasbihTarget == Custom,
+        };
+        custom.ValueChanged += (_, _) => { s.TasbihCustom = (int)custom.Value; n = 0; Data.Save(s); UpdateView(); };
+        targetRow.Controls.AddRange([target, custom, reset]);
         total = Block(Theme.UI(10f, FontStyle.Bold), Theme.Accent, 26);
 
         var right = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
@@ -98,12 +106,12 @@ public class TasbihForm : Form
         Controls.Add(root);
 
         list.SelectedIndexChanged += (_, _) => { idx = Math.Max(0, list.SelectedIndex); n = 0; UpdateView(); };
-        target.Changed += i => { s.TasbihTarget = Targets[i]; n = 0; Data.Save(s); UpdateView(); };
+        target.Changed += i => { s.TasbihTarget = Targets[i]; custom.Visible = Targets[i] == Custom; n = 0; Data.Save(s); UpdateView(); };
         reset.Click += (_, _) => { n = 0; UpdateView(); };
         list.SelectedIndex = 0;
     }
 
-    int Target => s.TasbihTarget == Recommended ? Dhikr.All.Value[idx].Recommended : s.TasbihTarget;
+    int Target => s.TasbihTarget switch { Recommended => Dhikr.All.Value[idx].Recommended, Custom => s.TasbihCustom, var t => t };
     int Current => n;
 
     void ResetIfNewDay()
