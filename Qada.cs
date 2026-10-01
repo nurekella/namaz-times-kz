@@ -14,7 +14,7 @@ public class QadaForm : Form
     public QadaForm(Settings settings)
     {
         s = settings;
-        Theme.Apply(this);
+        Theme.Apply(this, '\uE81C');
         Text = L.T("Qada");
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;

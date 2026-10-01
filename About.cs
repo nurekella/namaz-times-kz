@@ -12,7 +12,7 @@ public class AboutForm : Form
 
     public AboutForm(Action openNews)
     {
-        Theme.Apply(this);
+        Theme.Apply(this, '\uE946');
         Text = L.T("About");
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -82,7 +82,7 @@ public class NewsForm : Form
 {
     public NewsForm()
     {
-        Theme.Apply(this);
+        Theme.Apply(this, '\uE70B');
         Text = L.T("News");
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(Theme.Dp(640), Theme.Dp(700));
@@ -118,7 +118,7 @@ public class NewsForm : Form
                     Text = "•  " + item.GetString(), AutoSize = true, MaximumSize = new Size(w, 0), ForeColor = Theme.Text, Font = Theme.UI(10f),
                     Margin = new Padding(0, Theme.Dp(2), 0, Theme.Dp(2)), UseMnemonic = false,
                 });
-            body.Controls.Add(card);
+            body.Controls.Add(Theme.Round(card));
         }
         body.ResumeLayout();
     }

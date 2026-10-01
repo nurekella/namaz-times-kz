@@ -26,7 +26,7 @@ public class ZakatForm : Form
     {
         s = settings;
         var z = s.Zakat;
-        Theme.Apply(this);
+        Theme.Apply(this, '\uE8C7');
         Text = L.T("Zakat");
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;

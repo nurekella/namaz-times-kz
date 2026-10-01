@@ -22,14 +22,14 @@ public class AdhkarForm : Form
     readonly Label progress;
     readonly List<Item> items = [];
     bool morning;
-    static readonly Color Faded = Color.FromArgb(96, 105, 120);
+    static Color Faded => Theme.Faded;
 
     /// Morning adhkar until Dhuhr, evening ones after (unless told which).
     public AdhkarForm(Settings settings, bool? morningAdhkar = null)
     {
         s = settings;
         morning = morningAdhkar ?? DateTime.Now.Hour < 12;
-        Theme.Apply(this);
+        Theme.Apply(this, '\uE706');
         Text = L.T("Adhkar");
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(Theme.Dp(760), Theme.Dp(720));
@@ -125,7 +125,7 @@ public class AdhkarForm : Form
             card.Controls.Add(Lbl(Tr(e, "t"), Theme.UI(10f, FontStyle.Italic), Theme.Muted, 8, inner));
             card.Controls.Add(Lbl(Tr(e, "m"), Theme.UI(10.5f), Theme.Text, 8, inner));
             card.Controls.Add(Lbl(Tr(e, "ref"), Theme.UI(9f), NamesForm.Gold, 0, inner));
-            body.Controls.Add(card);
+            body.Controls.Add(Theme.Round(card));
 
             var item = new Item((morning ? "m" : "e") + index, e.GetProperty("n").GetInt32(), card, counter, texts);
             items.Add(item);

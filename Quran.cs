@@ -36,12 +36,21 @@ public static class QuranText
     }
 
     /// Tajweed colour groups (tajweed.txt stores "group start end;..." per verse, offsets into the "ar" line).
-    public static readonly (Color Color, string Key)[] Tajweed =
+    /// Colours are lighter on the dark theme and deeper on the light one.
+    public static (Color Color, string Key)[] Tajweed => Theme.IsDark ? DarkTajweed : LightTajweed;
+    static readonly (Color, string)[] DarkTajweed =
     [
         (Color.FromArgb(138, 145, 156), "TjSilent"), (Color.FromArgb(232, 176, 74), "TjMadd2"), (Color.FromArgb(240, 138, 60), "TjMaddJaiz"),
         (Color.FromArgb(232, 87, 63), "TjMaddWajib"), (Color.FromArgb(255, 77, 109), "TjMaddLazim"), (Color.FromArgb(79, 163, 255), "TjQalqala"),
         (Color.FromArgb(60, 207, 110), "TjGhunna"), (Color.FromArgb(42, 179, 160), "TjIdgham"), (Color.FromArgb(199, 125, 255), "TjIkhfa"),
         (Color.FromArgb(46, 196, 230), "TjIqlab"),
+    ];
+    static readonly (Color, string)[] LightTajweed =
+    [
+        (Color.FromArgb(150, 155, 165), "TjSilent"), (Color.FromArgb(196, 132, 10), "TjMadd2"), (Color.FromArgb(222, 104, 20), "TjMaddJaiz"),
+        (Color.FromArgb(205, 50, 35), "TjMaddWajib"), (Color.FromArgb(170, 20, 60), "TjMaddLazim"), (Color.FromArgb(25, 100, 215), "TjQalqala"),
+        (Color.FromArgb(25, 150, 70), "TjGhunna"), (Color.FromArgb(10, 128, 115), "TjIdgham"), (Color.FromArgb(135, 55, 200), "TjIkhfa"),
+        (Color.FromArgb(0, 145, 190), "TjIqlab"),
     ];
 
     public record struct Span(int Group, int Start, int End);
@@ -98,7 +107,7 @@ public class QuranForm : Form
     {
         s = settings;
         if (s.QuranTrans is not ("kk" or "ru" or "en")) s.QuranTrans = L.Lang is "kk" or "en" ? L.Lang : "ru";
-        Theme.Apply(this);
+        Theme.Apply(this, '\uE8F1');
         Text = L.T("Quran");
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(Theme.Dp(1180), Theme.Dp(780));
@@ -116,16 +125,18 @@ public class QuranForm : Form
         string[] ru = ["muntahab", "abuadel", "kuliev"];
         var ruButton = Drop(["Аль-Мунтахаб", "Абу Адель", "Кулиев"], () => Math.Max(0, Array.IndexOf(ru, s.QuranRu)), i => { s.QuranRu = ru[i]; Data.Save(s); view!.Rebuild(); });
         void ShowRu() => ruButton.Visible = s.QuranMeaning && s.QuranTrans == "ru"; // shown while "Русский" is picked
-        var translit = Check(L.T("QuranTranslit"), s.QuranTranslit);
-        var tajweed = Check(L.T("Tajweed"), s.QuranTajweed);
+        var translitSwitch = Theme.Switch(L.T("QuranTranslit"), s.QuranTranslit, out var translit);
+        var tajweedSwitch = Theme.Switch(L.T("Tajweed"), s.QuranTajweed, out var tajweed);
+        var colours = Theme.Button(L.T("TjColours"));
+        colours.Margin = new Padding(0, Theme.Dp(2), Theme.Dp(8), Theme.Dp(2));
         var size = new Stepper(s.QuranSize, 14, 40, 2);
-        bar.Controls.AddRange([font, trans, ruButton, translit, tajweed, Caption("QuranSize"), size]); // the font and language names speak for themselves
+        bar.Controls.AddRange([font, trans, ruButton, translitSwitch, tajweedSwitch, colours, Caption("QuranSize"), size]); // the font and language names speak for themselves
 
         // Tajweed colour legend, shown while colouring is on
-        var legend = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 0, 0, Theme.Dp(8)), Visible = s.QuranTajweed };
+        var legend = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 0, 0, Theme.Dp(8)) };
         foreach (var (color, key) in QuranText.Tajweed)
         {
-            var chip = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Theme.Card, Margin = new Padding(0, 0, Theme.Dp(5), Theme.Dp(5)), Padding = new Padding(Theme.Dp(4), Theme.Dp(1), Theme.Dp(6), Theme.Dp(1)) };
+            var chip = Theme.Round(new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Theme.Card, Margin = new Padding(0, 0, Theme.Dp(5), Theme.Dp(5)), Padding = new Padding(Theme.Dp(4), Theme.Dp(1), Theme.Dp(6), Theme.Dp(1)) }, 8);
             var dot = Theme.Label("●", color, 10f);
             dot.Margin = new Padding(0, Theme.Dp(3), Theme.Dp(4), Theme.Dp(3));
             var name = Theme.Label(L.T(key), Theme.Text, 8.5f);
@@ -135,20 +146,18 @@ public class QuranForm : Form
         }
 
         // Left: search + sura list
-        search = new TextBox
-        {
-            Dock = DockStyle.Top, BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle,
-            Font = Theme.UI(10.5f), PlaceholderText = L.T("QuranSearch"),
-        };
+        var searchBox = new SearchBox(L.T("QuranSearch")) { Dock = DockStyle.Top };
+        search = searchBox.Box;
         list = new ListBox
         {
             Dock = DockStyle.Fill, BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.None,
-            DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = Theme.Dp(40), IntegralHeight = false, Font = Theme.UI(10f),
+            DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = Theme.Dp(54), IntegralHeight = false, Font = Theme.UI(10f),
         };
         list.DrawItem += DrawSura;
         list.HandleCreated += (_, _) => Theme.DarkScrollbars(list);
-        var left = new Panel { Dock = DockStyle.Left, Width = Theme.Dp(250), Padding = new Padding(0, 0, Theme.Dp(12), 0) };
-        left.Controls.AddRange([list, new Panel { Dock = DockStyle.Top, Height = Theme.Dp(8) }, search]);
+        Theme.Round(list, 10);
+        var left = new Panel { Dock = DockStyle.Left, Width = Theme.Dp(290), Padding = new Padding(0, 0, Theme.Dp(12), 0) };
+        left.Controls.AddRange([list, new Panel { Dock = DockStyle.Top, Height = Theme.Dp(8) }, searchBox]);
 
         // Bottom: bookmark and sources (Tanzil asks for a visible link)
         bookmark = Theme.Label("", NamesForm.Gold, 9.5f);
@@ -166,13 +175,22 @@ public class QuranForm : Form
         var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true, Padding = new Padding(0, Theme.Dp(6), 0, 0) };
         bottom.Controls.AddRange([bookmark, sources]);
 
-        view = new VerseView(s) { Dock = DockStyle.Fill };
+        view = Theme.Round(new VerseView(s) { Dock = DockStyle.Fill }, 10);
         view.Bookmarked += UpdateBookmark;
         Controls.AddRange([view, left, legend, bar, bottom]);
 
         trans.Changed += i => { s.QuranMeaning = i < langs.Length; if (s.QuranMeaning) s.QuranTrans = langs[i]; Data.Save(s); ShowRu(); view.Rebuild(); };
         ShowRu();
-        tajweed.CheckedChanged += (_, _) => { s.QuranTajweed = legend.Visible = tajweed.Checked; Data.Save(s); view.Rebuild(); };
+        // The legend folds away behind "Colours ▾"; hovering a coloured letter also names its rule.
+        void ShowLegend()
+        {
+            colours.Visible = s.QuranTajweed;
+            legend.Visible = s.QuranTajweed && s.QuranLegend;
+            colours.Text = L.T("TjColours") + (legend.Visible ? "  ▴" : "  ▾");
+        }
+        colours.Click += (_, _) => { s.QuranLegend = !s.QuranLegend; Data.Save(s); ShowLegend(); };
+        ShowLegend();
+        tajweed.CheckedChanged += (_, _) => { s.QuranTajweed = tajweed.Checked; Data.Save(s); ShowLegend(); view.Rebuild(); };
         translit.CheckedChanged += (_, _) => { s.QuranTranslit = translit.Checked; Data.Save(s); view.Rebuild(); };
         size.ValueChanged += v => { s.QuranSize = v; Data.Save(s); view.Rebuild(); };
         search.TextChanged += (_, _) => Filter();
@@ -204,24 +222,6 @@ public class QuranForm : Form
         return b;
     }
 
-    static CheckBox Check(string text, bool value)
-    {
-        var c = new CheckBox
-        {
-            Text = text, Checked = value, Appearance = Appearance.Button, FlatStyle = FlatStyle.Flat, Font = Theme.UI(),
-            TextAlign = ContentAlignment.MiddleCenter, Cursor = Cursors.Hand, Margin = new Padding(0, Theme.Dp(2), Theme.Dp(6), Theme.Dp(2)),
-            Padding = new Padding(Theme.Dp(8), Theme.Dp(2), Theme.Dp(8), Theme.Dp(2)),
-        };
-        c.Size = TextRenderer.MeasureText(text, c.Font) + new Size(Theme.Dp(24), Theme.Dp(12)); // AutoSize clips button-style check boxes
-        c.FlatAppearance.BorderColor = Theme.Line;
-        c.FlatAppearance.CheckedBackColor = Theme.Accent;
-        c.FlatAppearance.MouseOverBackColor = Theme.Line;
-        void Style() { c.BackColor = c.Checked ? Theme.Accent : Theme.Card; c.ForeColor = c.Checked ? Theme.Bg : Theme.Text; }
-        c.CheckedChanged += (_, _) => Style();
-        Style();
-        return c;
-    }
-
     void Filter()
     {
         var f = search.Text.Trim();
@@ -242,20 +242,37 @@ public class QuranForm : Form
         list.SelectedIndex = shown.IndexOf(sura);
     }
 
+    Font? suraArFont;
+    readonly Font suraSub = Theme.UI(8.5f);
+
+    /// Sura row: number in a soft square, name with "Meccan · 7 verses" under it, Arabic name on the right.
     void DrawSura(object? sender, DrawItemEventArgs e)
     {
         if (e.Index < 0) return;
+        var g = e.Graphics;
         var n = shown[e.Index];
         var sura = QuranText.Suras.Value[n - 1];
         var selected = (e.State & DrawItemState.Selected) != 0;
-        using (var bg = new SolidBrush(selected ? Theme.Line : Theme.Card)) e.Graphics.FillRectangle(bg, e.Bounds);
-        if (selected) using (var bar = new SolidBrush(Theme.Accent)) e.Graphics.FillRectangle(bar, e.Bounds.X, e.Bounds.Y + Theme.Dp(8), Theme.Dp(3), e.Bounds.Height - Theme.Dp(16));
-        var countW = Theme.Dp(44);
-        TextRenderer.DrawText(e.Graphics, $"{n} · {sura.Name}", list.Font,
-            new Rectangle(e.Bounds.X + Theme.Dp(14), e.Bounds.Y, e.Bounds.Width - Theme.Dp(20) - countW, e.Bounds.Height),
-            selected ? Theme.Text : Theme.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(e.Graphics, sura.N.ToString(), list.Font, new Rectangle(e.Bounds.Right - countW - Theme.Dp(10), e.Bounds.Y, countW, e.Bounds.Height),
-            n == s.QuranSura ? NamesForm.Gold : Theme.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
+        var b = e.Bounds;
+        using (var bg = new SolidBrush(Theme.Card)) g.FillRectangle(bg, b);
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        if (selected)
+            using (var path = Theme.RoundRect(new RectangleF(b.X + Theme.Dp(4), b.Y + Theme.Dp(3), b.Width - Theme.Dp(8), b.Height - Theme.Dp(6)), Theme.Dp(8)))
+            using (var sel = new SolidBrush(Theme.Line)) g.FillPath(sel, path);
+        int sq = Theme.Dp(30), x = b.X + Theme.Dp(12);
+        var box = new Rectangle(x, b.Y + (b.Height - sq) / 2, sq, sq);
+        using (var path = Theme.RoundRect(box, Theme.Dp(7)))
+        using (var pen = new Pen(n == s.QuranSura ? Theme.Gold : selected ? Theme.Accent : Theme.Line, Theme.Dp(1))) g.DrawPath(pen, path);
+        TextRenderer.DrawText(g, n.ToString(), suraSub, box, n == s.QuranSura ? Theme.Gold : selected ? Theme.Accent : Theme.Muted,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        suraArFont ??= new Font(QuranText.Family(0), 15f * Theme.UiScale);
+        int arW = Theme.Dp(96), tx = x + sq + Theme.Dp(10), tw = b.Right - tx - arW - Theme.Dp(10);
+        TextRenderer.DrawText(g, sura.Name, list.Font, new Rectangle(tx, b.Y + Theme.Dp(8), tw, Theme.Dp(22)),
+            selected ? Theme.Text : Theme.Text, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        TextRenderer.DrawText(g, $"{L.T(sura.Mecca ? "Meccan" : "Medinan")} · {string.Format(L.T("Ayahs"), sura.N)}", suraSub,
+            new Rectangle(tx, b.Y + Theme.Dp(29), tw, Theme.Dp(18)), Theme.Muted, TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        TextRenderer.DrawText(g, sura.Ar, suraArFont, new Rectangle(b.Right - arW - Theme.Dp(12), b.Y, arW, b.Height),
+            selected ? Theme.Accent : Theme.Muted, TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.RightToLeft | TextFormatFlags.NoPrefix);
     }
 
     void UpdateBookmark()
@@ -279,9 +296,12 @@ public class QuranForm : Form
         Font? arFont;
         readonly Font tlFont = Theme.UI(10f, FontStyle.Italic), trFont = Theme.UI(11f), titleFont = Theme.UI(15f, FontStyle.Bold),
             subFont = Theme.UI(9.5f), numFont = Theme.UI(8.5f), noteFont = Theme.UI(9.5f, FontStyle.Italic);
-        static readonly Color Marked = Color.FromArgb(38, 48, 42);
+        static Color Marked => Theme.Marked;
         int Pad => Theme.Dp(22);
-        int NumW => Theme.Dp(40);
+        int NumW => Theme.Dp(46);
+        readonly ToolTip tip = new() { InitialDelay = 150, ReshowDelay = 50 };
+        string? tipText;
+        int trimTop, trimBottom; // unused line space the Arabic font reserves above and below
 
         public VerseView(Settings settings)
         {
@@ -317,6 +337,12 @@ public class QuranForm : Form
             tj = s.QuranTajweed ? QuranText.TajweedOf(Sura) : [];
             arFont?.Dispose();
             arFont = new Font(QuranText.Family(s.QuranFont), s.QuranSize * Theme.UiScale);
+            // Quran fonts declare very tall lines (room for stacked marks); trim what goes beyond a generous margin.
+            var fam = arFont.FontFamily;
+            float em = fam.GetEmHeight(arFont.Style), px = arFont.SizeInPoints * DeviceDpi / 72f;
+            float ascent = fam.GetCellAscent(arFont.Style) / em, descent = fam.GetCellDescent(arFont.Style) / em;
+            trimTop = (int)(Math.Max(0, ascent - 1.25f) * px);
+            trimBottom = (int)(Math.Max(0, descent - 0.65f) * px);
             Measure();
         }
 
@@ -330,8 +356,13 @@ public class QuranForm : Form
         // which is what tajweed colouring needs. Translations stay on GDI (TextRenderer).
         static readonly StringFormat ArFormat = new(StringFormatFlags.DirectionRightToLeft);
         Graphics? measure;
-        Graphics M => measure ??= CreateGraphics();
-        int ArH(string text) => (int)Math.Ceiling(M.MeasureString(text, arFont!, TextW, ArFormat).Height);
+        // Measuring and every drawing pass must use the same text hint: grid fitting changes glyph advances,
+        // and colours would then land beside their letters.
+        const System.Drawing.Text.TextRenderingHint Hint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+        Graphics M => measure ??= Measuring();
+        Graphics Measuring() { var g = CreateGraphics(); g.TextRenderingHint = Hint; return g; }
+        int FullArH(string text) => (int)Math.Ceiling(M.MeasureString(text, arFont!, TextW, ArFormat).Height);
+        int ArH(string text) => FullArH(text) - trimTop - trimBottom;
 
         /// Union of the areas of each tajweed group's letters, for a verse laid out at (0, 0).
         Region?[] Regions(int i, int h)
@@ -355,11 +386,12 @@ public class QuranForm : Form
         void DrawArabic(Graphics g, int i, int x, int y, int h)
         {
             var rect = new RectangleF(0, 0, TextW, h);
+            var hint = g.TextRenderingHint;
+            g.TextRenderingHint = Hint;
             var state = g.Save();
             g.TranslateTransform(x, y);
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             using var text = new SolidBrush(Theme.Text);
-            if (tj.Length == 0) { g.DrawString(ar[i], arFont!, text, rect, ArFormat); g.Restore(state); return; }
+            if (tj.Length == 0) { g.DrawString(ar[i], arFont!, text, rect, ArFormat); g.Restore(state); g.TextRenderingHint = hint; return; }
             // Each pixel is drawn once: plain text outside the coloured letters, each colour inside its own area
             // (drawing colour over white would leave white anti-aliasing fringes).
             var regions = Regions(i, h);
@@ -380,6 +412,7 @@ public class QuranForm : Form
                 g.DrawString(ar[i], arFont!, b, rect, ArFormat);
             }
             g.Restore(state);
+            g.TextRenderingHint = hint;
         }
 
         void Measure()
@@ -421,11 +454,72 @@ public class QuranForm : Form
             Invalidate();
         }
 
+        static System.Drawing.Drawing2D.GraphicsPath Star(Rectangle r)
+        {
+            var p = new System.Drawing.Drawing2D.GraphicsPath();
+            float cx = r.X + r.Width / 2f, cy = r.Y + r.Height / 2f, ro = r.Width / 2f, ri = ro * 0.82f;
+            var pts = new PointF[16];
+            for (int k = 0; k < 16; k++)
+            {
+                var a = Math.PI / 8 * k - Math.PI / 2;
+                var rad = k % 2 == 0 ? ro : ri;
+                pts[k] = new PointF(cx + (float)(rad * Math.Cos(a)), cy + (float)(rad * Math.Sin(a)));
+            }
+            p.AddPolygon(pts);
+            return p;
+        }
+
+        int VerseAt(int y) => Enumerable.Range(0, tops.Length).FirstOrDefault(k => y >= tops[k] && y < tops[k] + heights[k], -1);
+
+        // Name the tajweed rule under the mouse.
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            base.OnMouseMove(e);
+            string? text = null;
+            int y = e.Y - AutoScrollPosition.Y, i = VerseAt(y);
+            if (i >= 0 && tj.Length > 0)
+            {
+                var pt = new PointF(e.X - (Pad + NumW), y - (tops[i] + Theme.Dp(14)) + trimTop);
+                var regions = Regions(i, arHeights[i] + trimTop + trimBottom);
+                for (int k = 0; k < regions.Length; k++)
+                    if (regions[k]?.IsVisible(pt, M) == true) { text = L.T(QuranText.Tajweed[k].Key); break; }
+            }
+            if (text == tipText) return;
+            tipText = text;
+            if (text == null) tip.Hide(this); else tip.Show(text, this, e.X + Theme.Dp(12), e.Y + Theme.Dp(18));
+        }
+
+        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); tipText = null; tip.Hide(this); }
+
+        // Smooth wheel scrolling: glide to the target instead of jumping.
+        readonly System.Windows.Forms.Timer glide = new() { Interval = 15 };
+        int glideTarget = -1;
+        protected override void OnMouseWheel(MouseEventArgs e)
+        {
+            int max = Math.Max(0, AutoScrollMinSize.Height - ClientSize.Height);
+            int from = glideTarget >= 0 ? glideTarget : -AutoScrollPosition.Y;
+            glideTarget = Math.Clamp(from - e.Delta * SystemInformation.MouseWheelScrollLines * Theme.Dp(40) / 120 / 3 * 2, 0, max);
+            if (!glide.Enabled)
+            {
+                glide.Tick -= Glide;
+                glide.Tick += Glide;
+                glide.Start();
+            }
+        }
+
+        void Glide(object? sender, EventArgs e)
+        {
+            int cur = -AutoScrollPosition.Y;
+            int step = (glideTarget - cur) / 4;
+            if (Math.Abs(glideTarget - cur) <= 2 || step == 0) { AutoScrollPosition = new Point(0, glideTarget); glide.Stop(); glideTarget = -1; return; }
+            AutoScrollPosition = new Point(0, cur + step);
+        }
+
         protected override void OnMouseClick(MouseEventArgs e)
         {
             base.OnMouseClick(e);
             var y = e.Y - AutoScrollPosition.Y;
-            var i = Enumerable.Range(0, tops.Length).FirstOrDefault(k => y >= tops[k] && y < tops[k] + heights[k], -1);
+            var i = VerseAt(y);
             if (i < 0) return;
             s.QuranSura = Sura;
             s.QuranAya = i + 1;
@@ -461,16 +555,19 @@ public class QuranForm : Form
                 if (marked) using (var b = new SolidBrush(Marked)) g.FillRectangle(b, 0, top, w, heights[i]);
                 g.DrawLine(line, Pad, top, w - Pad, top);
 
-                // verse number in a circle (gold when bookmarked)
-                int d = Theme.Dp(28);
-                var circle = new Rectangle(Pad, top + Theme.Dp(14), d, d);
-                g.DrawEllipse(marked ? gold : accent, circle);
-                TextRenderer.DrawText(g, (i + 1).ToString(), numFont, circle, marked ? NamesForm.Gold : Theme.Accent,
+                // verse number in an eight-point star, like the ayah marks of a mushaf (gold when bookmarked)
+                int d = Theme.Dp(34);
+                var star = new Rectangle(Pad - Theme.Dp(3), top + Theme.Dp(12), d, d);
+                using (var path = Star(star)) g.DrawPath(marked ? gold : accent, path);
+                TextRenderer.DrawText(g, (i + 1).ToString(), numFont, star, marked ? NamesForm.Gold : Theme.Accent,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
 
                 int y = top + Theme.Dp(14);
                 int h = arHeights[i];
-                DrawArabic(g, i, x, y, h);
+                var clip = g.Clip;
+                g.SetClip(new Rectangle(x - Theme.Dp(4), y - Theme.Dp(4), TextW + Theme.Dp(8), h + Theme.Dp(8)), System.Drawing.Drawing2D.CombineMode.Intersect);
+                DrawArabic(g, i, x, y - trimTop, h + trimTop + trimBottom);
+                g.Clip = clip;
                 y += h;
                 if (tl.Length > 0)
                 {

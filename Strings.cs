@@ -117,6 +117,11 @@ public static class L
         // Quran
         ["Quran"] = ("Құран", "Коран", "Quran"),
         ["QuranTranslit"] = ("Транскрипция", "Транскрипция", "Transliteration"),
+        ["TjColours"] = ("Түстер", "Цвета", "Colours"),
+        ["ThemeMode"] = ("Тақырып", "Тема", "Theme"),
+        ["ThemeSystem"] = ("Windows сияқты", "Как в Windows", "Like Windows"),
+        ["ThemeDark"] = ("Қараңғы", "Тёмная", "Dark"),
+        ["ThemeLight"] = ("Ашық", "Светлая", "Light"),
         ["Tajweed"] = ("Тәжуид", "Таджуид", "Tajweed"),
         ["TjSilent"] = ("Оқылмайтын әріп", "Непроизносимая буква", "Silent letter"),
         ["TjMadd2"] = ("Табиғи мәд (2)", "Естественный мадд (2)", "Natural madd (2)"),

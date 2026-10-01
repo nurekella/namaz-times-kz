@@ -65,6 +65,8 @@ public class Settings
     public string QuranRu { get; set; } = "muntahab"; // Russian translation: muntahab / abuadel / kuliev
     public bool QuranTranslit { get; set; } = true;
     public bool QuranTajweed { get; set; } = true;
+    public bool QuranLegend { get; set; } // tajweed colour legend expanded
+    public int ThemeMode { get; set; } = 1; // 0 = like Windows, 1 = dark, 2 = light
     public bool QuranMeaning { get; set; } = true;
     public int QuranSize { get; set; } = 22; // Arabic font size, pt
     public int QuranSura { get; set; } = 1; // bookmark

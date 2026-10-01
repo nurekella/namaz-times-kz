@@ -49,7 +49,7 @@ public class NamesForm : Form
 
     public NamesForm()
     {
-        Theme.Apply(this);
+        Theme.Apply(this, '\uE82D');
         Text = L.T("Names99");
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(Theme.Dp(720), Theme.Dp(660));
@@ -57,11 +57,8 @@ public class NamesForm : Form
         var today = Name99.OfDay(DateOnly.FromDateTime(DateTime.Today));
         selected = today;
 
-        var search = new TextBox
-        {
-            Dock = DockStyle.Top, PlaceholderText = L.T("Search"), BackColor = Theme.Card, ForeColor = Theme.Text,
-            BorderStyle = BorderStyle.FixedSingle, Font = Theme.UI(11f),
-        };
+        var searchPanel = new SearchBox(L.T("Search")) { Dock = DockStyle.Top };
+        var search = searchPanel.Box;
         var detail = new DetailPanel(this) { Dock = DockStyle.Bottom, Height = Theme.Dp(170) };
         var grid = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(0, Theme.Dp(8), 0, Theme.Dp(8)) };
         grid.HandleCreated += (_, _) => Theme.DarkScrollbars(grid);
@@ -79,7 +76,7 @@ public class NamesForm : Form
             tiles.Add(t);
         }
         grid.Controls.AddRange([.. tiles]);
-        Controls.AddRange([grid, detail, search]);
+        Controls.AddRange([grid, detail, searchPanel]);
 
         // ‹ › under the details: previous / next name (wraps around 1 ↔ 99); arrow keys do the same.
         step = d => Select(Name99.All.Value[(selected.N - 1 + d + 99) % 99]);
@@ -176,5 +173,5 @@ public class NamesForm : Form
         }
     }
 
-    public static readonly Color Gold = Color.FromArgb(230, 190, 110);
+    public static Color Gold => Theme.Gold;
 }

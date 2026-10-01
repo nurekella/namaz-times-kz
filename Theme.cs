@@ -3,38 +3,123 @@ using System.Runtime.InteropServices;
 
 namespace NamazTimes;
 
-/// Dark palette shared by the widget and all windows, plus a few small owner-drawn controls.
+/// Palette shared by all windows (dark or light, see SetMode), plus a few small owner-drawn controls.
+/// The desktop widget keeps its own night palette (Night*).
 public static class Theme
 {
-    public static readonly Color Bg = Color.FromArgb(24, 28, 34);
-    public static readonly Color Card = Color.FromArgb(33, 38, 46);
-    public static readonly Color Line = Color.FromArgb(48, 54, 64);
-    public static readonly Color Text = Color.FromArgb(235, 238, 242);
-    public static readonly Color Muted = Color.FromArgb(150, 160, 175);
-    public static readonly Color Accent = Color.FromArgb(94, 196, 140);
+    public static Color Bg, Card, Line, Text, Muted, Accent, OnAccent, Gold, Faded, Marked;
+    public static bool IsDark = true;
+    public static readonly Color NightBg = Color.FromArgb(24, 28, 34), NightLine = Color.FromArgb(48, 54, 64), NightAccent = Color.FromArgb(94, 196, 140);
+
+    static Theme() => SetMode(1);
+
+    /// 0 = follow Windows, 1 = dark, 2 = light. Takes effect for windows opened afterwards.
+    public static void SetMode(int mode)
+    {
+        IsDark = mode switch { 1 => true, 2 => false, _ => SystemDark() };
+        if (IsDark)
+        {
+            (Bg, Card, Line) = (NightBg, Color.FromArgb(33, 38, 46), NightLine);
+            (Text, Muted, Accent, OnAccent) = (Color.FromArgb(235, 238, 242), Color.FromArgb(150, 160, 175), NightAccent, NightBg);
+            (Gold, Faded, Marked) = (Color.FromArgb(230, 190, 110), Color.FromArgb(96, 105, 120), Color.FromArgb(38, 48, 42));
+        }
+        else
+        {
+            (Bg, Card, Line) = (Color.FromArgb(243, 244, 246), Color.White, Color.FromArgb(222, 226, 231));
+            (Text, Muted, Accent, OnAccent) = (Color.FromArgb(28, 32, 38), Color.FromArgb(100, 108, 120), Color.FromArgb(26, 140, 88), Color.White);
+            (Gold, Faded, Marked) = (Color.FromArgb(166, 112, 14), Color.FromArgb(170, 176, 186), Color.FromArgb(232, 245, 236));
+        }
+    }
+
+    static bool SystemDark()
+    {
+        try
+        {
+            using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            return k?.GetValue("AppsUseLightTheme") is not int light || light == 0;
+        }
+        catch { return true; }
+    }
 
     static readonly int Dpi = (int)Graphics.FromHwnd(IntPtr.Zero).DpiX;
     /// Scale of all windows (Settings → General → Window scale); applied when a window is built.
     public static float UiScale = 1f;
     public static int Dp(int v) => (int)Math.Round(v * Dpi / 96f * UiScale);
 
-    public static Font UI(float size = 10f, FontStyle style = FontStyle.Regular) => new("Segoe UI", size * UiScale, style);
+    // Windows 11 ships Segoe UI Variable, which reads better; Windows 10 falls back to Segoe UI.
+    static readonly bool Variable = FontFamily.Families.Any(f => f.Name == "Segoe UI Variable Text");
+    public static Font UI(float size = 10f, FontStyle style = FontStyle.Regular) => Variable
+        ? new(style.HasFlag(FontStyle.Bold) ? "Segoe UI Variable Text Semibold" : "Segoe UI Variable Text", size * UiScale, style & ~FontStyle.Bold)
+        : new("Segoe UI", size * UiScale, style);
 
     public static Icon AppIcon(Size? size = null) =>
         new(typeof(Theme).Assembly.GetManifestResourceStream("app.ico")!, size ?? SystemInformation.IconSize);
 
-    /// Dark window chrome + colours for a top-level form.
-    public static void Apply(Form f)
+    /// Window chrome in the theme's colours (Windows 11 colours the title bar too), an icon for the window
+    /// (the feature's glyph on a green tile, or the app icon), and a short fade-in.
+    public static void Apply(Form f, char glyph = '\0')
     {
         f.BackColor = Bg;
         f.ForeColor = Text;
         f.Font = UI();
-        f.Icon = AppIcon();
+        f.Icon = glyph == '\0' ? AppIcon() : GlyphIcon(glyph);
         f.HandleCreated += (_, _) =>
         {
-            int on = 1;
-            DwmSetWindowAttribute(f.Handle, 20 /*DWMWA_USE_IMMERSIVE_DARK_MODE*/, ref on, sizeof(int));
+            int dark = IsDark ? 1 : 0;
+            DwmSetWindowAttribute(f.Handle, 20 /*DWMWA_USE_IMMERSIVE_DARK_MODE*/, ref dark, sizeof(int));
+            int caption = ColorTranslator.ToWin32(Bg), text = ColorTranslator.ToWin32(Text), border = ColorTranslator.ToWin32(Line);
+            DwmSetWindowAttribute(f.Handle, 35 /*DWMWA_CAPTION_COLOR*/, ref caption, sizeof(int));
+            DwmSetWindowAttribute(f.Handle, 36 /*DWMWA_TEXT_COLOR*/, ref text, sizeof(int));
+            DwmSetWindowAttribute(f.Handle, 34 /*DWMWA_BORDER_COLOR*/, ref border, sizeof(int));
         };
+        f.Opacity = 0;
+        f.Shown += (_, _) =>
+        {
+            var t = new System.Windows.Forms.Timer { Interval = 15 };
+            var start = Environment.TickCount64;
+            t.Tick += (_, _) =>
+            {
+                var k = Math.Min(1.0, (Environment.TickCount64 - start) / 160.0);
+                f.Opacity = 1 - Math.Pow(1 - k, 3); // ease-out
+                if (k >= 1) t.Dispose();
+            };
+            t.Start();
+        };
+    }
+
+    static Icon GlyphIcon(char glyph)
+    {
+        const int size = 64;
+        using var bmp = new Bitmap(size, size);
+        using (var g = Graphics.FromImage(bmp))
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+            using var tile = RoundRect(new RectangleF(2, 2, size - 4, size - 4), 14);
+            using var b = new SolidBrush(NightAccent);
+            g.FillPath(b, tile);
+            using var font = new Font("Segoe MDL2 Assets", 34, GraphicsUnit.Pixel);
+            using var fg = new SolidBrush(NightBg);
+            g.DrawString(glyph.ToString(), font, fg, new RectangleF(0, 2, size, size),
+                new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
+        }
+        return Icon.FromHandle(bmp.GetHicon());
+    }
+
+    /// Rounds a panel's corners (clipping region, kept in step with its size).
+    public static T Round<T>(T c, int radius = 10) where T : Control
+    {
+        void Clip()
+        {
+            if (c.Width <= 0 || c.Height <= 0) return;
+            using var p = RoundRect(new RectangleF(0, 0, c.Width, c.Height), Dp(radius));
+            var old = c.Region;
+            c.Region = new Region(p);
+            old?.Dispose();
+        }
+        c.SizeChanged += (_, _) => Clip();
+        Clip();
+        return c;
     }
 
     public static Label Label(string text, Color? color = null, float size = 10f, FontStyle style = FontStyle.Regular) => new()
@@ -43,18 +128,25 @@ public static class Theme
         Anchor = AnchorStyles.Left, Margin = new Padding(0, Dp(7), Dp(12), Dp(7)),
     };
 
-    public static Button Button(string text, bool primary = false)
+    public static Button Button(string text, bool primary = false) => new RoundButton
     {
-        var b = new Button
-        {
-            Text = text, AutoSize = true, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand,
-            BackColor = primary ? Accent : Card, ForeColor = primary ? Bg : Text,
-            Font = UI(10f, primary ? FontStyle.Bold : FontStyle.Regular),
-            Padding = new Padding(Dp(10), Dp(3), Dp(10), Dp(3)),
-        };
-        b.FlatAppearance.BorderColor = primary ? Accent : Line;
-        b.FlatAppearance.MouseOverBackColor = primary ? ControlPaint.Light(Accent) : Line;
-        return b;
+        Text = text, AutoSize = true, Cursor = Cursors.Hand,
+        BackColor = primary ? Accent : Card, ForeColor = primary ? OnAccent : Text,
+        Font = UI(10f, primary ? FontStyle.Bold : FontStyle.Regular),
+        Padding = new Padding(Dp(10), Dp(3), Dp(10), Dp(3)),
+    };
+
+    /// On/off switch with a label; clicking the label toggles it too.
+    public static FlowLayoutPanel Switch(string text, bool value, out Toggle toggle)
+    {
+        var t = toggle = new Toggle(value);
+        var l = Label(text, Text, 10f);
+        l.Margin = new Padding(Dp(4), Dp(5), 0, 0);
+        l.Cursor = Cursors.Hand;
+        l.Click += (_, _) => t.Checked = !t.Checked;
+        var p = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(Dp(6), Dp(6), Dp(10), Dp(2)) };
+        p.Controls.AddRange([t, l]);
+        return p;
     }
 
     /// Rounded "card" panel holding a two-column grid of rows.
@@ -65,6 +157,7 @@ public static class Theme
             AutoSize = true, ColumnCount = 1, BackColor = Card, Dock = DockStyle.Top,
             Padding = new Padding(Dp(14), Dp(10), Dp(14), Dp(10)), Margin = new Padding(0, 0, 0, Dp(12)),
         };
+        Round(outer);
         outer.Controls.Add(Label(title, Accent, 10.5f, FontStyle.Bold));
         grid = new TableLayoutPanel { AutoSize = true, ColumnCount = columns, Dock = DockStyle.Fill, Margin = Padding.Empty };
         outer.Controls.Add(grid);
@@ -83,10 +176,10 @@ public static class Theme
         return p;
     }
 
-    /// Windows 10/11 dark scrollbars for standard controls.
-    public static void DarkScrollbars(Control c) => SetWindowTheme(c.Handle, "DarkMode_Explorer", null);
+    /// Windows 10/11 dark scrollbars for standard controls (light theme keeps the default ones).
+    public static void DarkScrollbars(Control c) { if (IsDark) SetWindowTheme(c.Handle, "DarkMode_Explorer", null); }
 
-    /// Dark context menu with rounded corners (Windows 11) and icon glyphs.
+    /// Context menu in the theme's colours with rounded corners (Windows 11) and icon glyphs.
     public static ContextMenuStrip Menu()
     {
         var m = new ContextMenuStrip
@@ -185,6 +278,74 @@ public static class Theme
     [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)] static extern int SetWindowTheme(IntPtr h, string? app, string? idList);
 }
 
+/// Flat button with rounded corners; hover lightens it. BackColor/ForeColor as with a normal button.
+public class RoundButton : Button
+{
+    bool hot;
+
+    public RoundButton()
+    {
+        FlatStyle = FlatStyle.Flat;
+        FlatAppearance.BorderSize = 0;
+        SetStyle(ControlStyles.SupportsTransparentBackColor | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+    }
+
+    protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hot = true; Invalidate(); }
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hot = false; Invalidate(); }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.Clear(Parent?.BackColor ?? Theme.Bg);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        var primary = BackColor == Theme.Accent;
+        var fill = !Enabled ? Theme.Card : hot ? (primary ? ControlPaint.Light(BackColor, 0.25f) : Theme.Line) : BackColor;
+        var r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
+        using var path = Theme.RoundRect(r, Theme.Dp(7));
+        using (var b = new SolidBrush(fill)) g.FillPath(b, path);
+        if (!primary) using (var p = new Pen(Theme.Line)) g.DrawPath(p, path);
+        TextRenderer.DrawText(g, Text, Font, ClientRectangle, Enabled ? ForeColor : Theme.Muted,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+    }
+}
+
+/// Text box with a magnifier, rounded corners and no white Windows border.
+public class SearchBox : Panel
+{
+    public readonly TextBox Box;
+
+    public SearchBox(string placeholder)
+    {
+        Height = Theme.Dp(36);
+        Padding = new Padding(Theme.Dp(34), Theme.Dp(8), Theme.Dp(10), 0);
+        BackColor = Theme.Card;
+        DoubleBuffered = true;
+        Box = new TextBox
+        {
+            Dock = DockStyle.Fill, BorderStyle = BorderStyle.None, BackColor = Theme.Card, ForeColor = Theme.Text,
+            Font = Theme.UI(10.5f), PlaceholderText = placeholder,
+        };
+        Controls.Add(Box);
+        Cursor = Cursors.IBeam;
+        Click += (_, _) => Box.Focus();
+        Box.GotFocus += (_, _) => Invalidate();
+        Box.LostFocus += (_, _) => Invalidate();
+    }
+
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        g.Clear(Parent?.BackColor ?? Theme.Bg);
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        using var path = Theme.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), Theme.Dp(8));
+        using (var b = new SolidBrush(Theme.Card)) g.FillPath(b, path);
+        using (var p = new Pen(Box.Focused ? Theme.Accent : Theme.Line)) g.DrawPath(p, path);
+        using var icon = new Font("Segoe MDL2 Assets", 10f * Theme.UiScale);
+        TextRenderer.DrawText(g, "", icon, new Rectangle(Theme.Dp(10), 0, Theme.Dp(20), Height), Theme.Muted,
+            TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter);
+    }
+}
+
 /// iOS-style on/off switch.
 public class Toggle : Control
 {
@@ -221,7 +382,7 @@ public class Toggle : Control
         g.FillPath(fill, track);
         var d = r.Height - Theme.Dp(6);
         var x = on ? r.Right - d - Theme.Dp(3) : r.X + Theme.Dp(3);
-        using var knob = new SolidBrush(on ? Theme.Bg : Theme.Muted);
+        using var knob = new SolidBrush(on ? Theme.OnAccent : Theme.Muted);
         g.FillEllipse(knob, x, r.Y + Theme.Dp(3), d, d);
     }
 }
@@ -272,39 +433,58 @@ public class Stepper : FlowLayoutPanel
     }
 }
 
-/// Row of mutually exclusive flat buttons.
+/// Row of mutually exclusive options in a rounded track; the chosen one is a green pill.
 public class Segmented : FlowLayoutPanel
 {
-    readonly List<RadioButton> items = [];
+    readonly List<Item> items = [];
     public event Action<int>? Changed;
 
     public Segmented(IEnumerable<string> options, int selected)
     {
         AutoSize = true; WrapContents = false; Margin = new Padding(0, Theme.Dp(2), 0, Theme.Dp(2)); Anchor = AnchorStyles.Left;
+        Padding = new Padding(Theme.Dp(3));
+        BackColor = Theme.Card;
+        DoubleBuffered = true;
         foreach (var o in options)
         {
-            var rb = new RadioButton
+            var rb = new Item(this)
             {
-                Text = o, Appearance = Appearance.Button, FlatStyle = FlatStyle.Flat, AutoSize = true,
-                TextAlign = ContentAlignment.MiddleCenter, Margin = Padding.Empty, Cursor = Cursors.Hand,
+                Text = o, AutoSize = true, Margin = Padding.Empty, Cursor = Cursors.Hand, Font = Theme.UI(),
                 Padding = new Padding(Theme.Dp(8), Theme.Dp(2), Theme.Dp(8), Theme.Dp(2)),
             };
-            rb.FlatAppearance.BorderColor = Theme.Line;
-            rb.FlatAppearance.CheckedBackColor = Theme.Accent;
-            rb.FlatAppearance.MouseOverBackColor = Theme.Line;
-            rb.CheckedChanged += (_, _) => { Style(rb); if (rb.Checked) Changed?.Invoke(items.IndexOf(rb)); };
+            rb.CheckedChanged += (_, _) => { rb.Invalidate(); if (rb.Checked) Changed?.Invoke(items.IndexOf(rb)); };
             items.Add(rb);
             Controls.Add(rb);
         }
         items[Math.Clamp(selected, 0, items.Count - 1)].Checked = true;
-        items.ForEach(Style);
-    }
-
-    static void Style(RadioButton rb)
-    {
-        rb.BackColor = rb.Checked ? Theme.Accent : Theme.Card;
-        rb.ForeColor = rb.Checked ? Theme.Bg : Theme.Text;
+        Theme.Round(this, 9);
     }
 
     public int Selected => items.FindIndex(i => i.Checked);
+
+    class Item(Segmented owner) : RadioButton
+    {
+        bool hot;
+        protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hot = true; Invalidate(); }
+        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hot = false; Invalidate(); }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.Clear(owner.BackColor);
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            if (Checked || hot)
+            {
+                using var pill = Theme.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), Theme.Dp(6));
+                using var b = new SolidBrush(Checked ? Theme.Accent : Theme.Line);
+                g.FillPath(b, pill);
+            }
+            TextRenderer.DrawText(g, Text, Font, ClientRectangle, Checked ? Theme.OnAccent : Theme.Text,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+        }
+
+        // Radio buttons size for their check circle; a pill only needs the text plus padding.
+        public override Size GetPreferredSize(Size proposed) =>
+            TextRenderer.MeasureText(Text, Font) + new Size(Padding.Horizontal + Theme.Dp(6), Padding.Vertical + Theme.Dp(10));
+    }
 }

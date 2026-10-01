@@ -55,7 +55,7 @@ public class Widget : Form
         KeyPreview = true;
         StartPosition = FormStartPosition.Manual;
         DoubleBuffered = true;
-        BackColor = Theme.Bg;
+        BackColor = Theme.NightBg;
         Text = "Namaz Times KZ";
         Icon = Theme.AppIcon();
 
@@ -110,6 +110,7 @@ public class Widget : Form
         L.Lang = s.Lang;
         L.Hour12 = s.Hour12;
         Theme.UiScale = Math.Clamp(s.UiScale, 80, 160) / 100f;
+        Theme.SetMode(s.ThemeMode); // windows opened from now on
         showItem.Text = L.T("ShowWidget");
         monthItem.Text = L.T("Month");
         holidaysItem.Text = L.T("Holidays");
@@ -467,7 +468,7 @@ public class Widget : Form
         float y = oy + Z(TopStrip + 6);
         var city = s.City.Title + (s.Muted ? " 🔕" : "");
         var cityW = TextRenderer.MeasureText(g, city, head, Size.Empty, TextFormatFlags.NoPadding).Width;
-        var cityColor = hotCity ? Theme.Accent : Color.White; // green on hover: it is clickable
+        var cityColor = hotCity ? Theme.NightAccent : Color.White; // green on hover: it is clickable
         TextRenderer.DrawText(g, city, head, Rectangle.Round(new RectangleF(left, y, right - left, Z(19))), cityColor, Right | TextFormatFlags.EndEllipsis);
         // Location arrow (like iOS "location.fill"); Segoe MDL2 has no such glyph.
         float ax = right - cityW - Z(19), ay = y + Z(4.5f), a = Z(10);
@@ -478,7 +479,7 @@ public class Widget : Form
         var date = now.ToString(L.Lang == "ru" ? "d MMMM yyyy" : "d MMMM, yyyy", L.Culture);
         if (L.Lang != "ru") { var sp = date.IndexOf(' ') + 1; date = date[..sp] + char.ToUpper(date[sp], L.Culture) + date[(sp + 1)..]; }
         var lines = new List<(string Text, Color Color)> { (date, Grey), (Hijri.Format(DateOnly.FromDateTime(now), s.HijriAdjust), Grey) };
-        if (holiday != null) lines.Add(("✦ " + L.T(holiday.Key), Theme.Accent));
+        if (holiday != null) lines.Add(("✦ " + L.T(holiday.Key), Theme.NightAccent));
         foreach (var (text, color) in lines)
         {
             TextRenderer.DrawText(g, text, head, Rectangle.Round(new RectangleF(left, y, right - left, Z(19))), color, Right | TextFormatFlags.EndEllipsis);
@@ -614,7 +615,7 @@ public class Widget : Form
         for (int i = 0; i < 3; i++)
         {
             if (i == hot)
-                using (var hb = new SolidBrush(i == 2 ? Color.FromArgb(196, 43, 28) : Theme.Line)) g.FillRectangle(hb, captions[i]);
+                using (var hb = new SolidBrush(i == 2 ? Color.FromArgb(196, 43, 28) : Theme.NightLine)) g.FillRectangle(hb, captions[i]);
             TextRenderer.DrawText(g, glyphs[i], capFont, Rectangle.Round(captions[i]), i == hot ? Color.White : Grey,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         }

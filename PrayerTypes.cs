@@ -18,7 +18,7 @@ public class PrayerTypesForm : Form
 
     public PrayerTypesForm()
     {
-        Theme.Apply(this);
+        Theme.Apply(this, '\uE736');
         Text = L.T("PrayerTypes");
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(Theme.Dp(960), Theme.Dp(680));
@@ -102,7 +102,7 @@ public class PrayerTypesForm : Form
                 card.Controls.Add(ar);
             }
             card.Controls.Add(In(Tr(e), Theme.UI(10.5f, arabic ? FontStyle.Italic : FontStyle.Regular), Theme.Text, 0));
-            body.Controls.Add(card);
+            body.Controls.Add(Theme.Round(card));
         }
         if (p.TryGetProperty("ayah", out var ayah)) Evidence(L.T("Ayah"), ayah, true);
         Evidence(L.T("Hadith"), p.GetProperty("hadith"), false);
@@ -111,5 +111,5 @@ public class PrayerTypesForm : Form
         scroll.AutoScrollPosition = Point.Empty;
     }
 
-    static readonly Color Names99Gold = NamesForm.Gold;
+    static Color Names99Gold => NamesForm.Gold;
 }

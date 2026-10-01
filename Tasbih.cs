@@ -33,7 +33,7 @@ public class TasbihForm : Form
     public TasbihForm(Settings settings)
     {
         s = settings;
-        Theme.Apply(this);
+        Theme.Apply(this, '\uECCB');
         Text = L.T("Tasbih");
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -66,6 +66,7 @@ public class TasbihForm : Form
                     Theme.Accent, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
         };
         list.HandleCreated += (_, _) => Theme.DarkScrollbars(list);
+        Theme.Round(list, 10);
 
         // Right: the selected dhikr and the counter (fixed heights so the window doesn't jump between dhikrs)
         int w = Theme.Dp(400);
@@ -91,7 +92,7 @@ public class TasbihForm : Form
         var custom = new NumericUpDown
         {
             Minimum = 10, Maximum = 100_000, Value = Math.Clamp(s.TasbihCustom, 10, 100_000), Width = Theme.Dp(84), Font = Theme.UI(11f),
-            BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, TextAlign = HorizontalAlignment.Center,
+            BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.None, TextAlign = HorizontalAlignment.Center,
             Margin = new Padding(0, Theme.Dp(3), Theme.Dp(8), 0), Visible = s.TasbihTarget == Custom,
         };
         custom.ValueChanged += (_, _) => { s.TasbihCustom = (int)custom.Value; n = 0; Data.Save(s); UpdateView(); };
@@ -182,14 +183,27 @@ public class TasbihForm : Form
     class Ring : Control
     {
         readonly TasbihForm f;
+        float sweep; // drawn arc, eased towards the real one so each count glides
+        readonly System.Windows.Forms.Timer anim = new() { Interval = 15 };
+
+        float Target => f.Target > 0 ? 360f * Math.Min(f.Current, f.Target) / f.Target : f.Current % 100 * 3.6f;
 
         public Ring(TasbihForm owner)
         {
             f = owner;
+            anim.Tick += (_, _) =>
+            {
+                var t = Target;
+                sweep += (t - sweep) * 0.3f;
+                if (Math.Abs(t - sweep) < 0.5f) { sweep = t; anim.Stop(); }
+                base.Invalidate();
+            };
             Size = new Size(Theme.Dp(200), Theme.Dp(200));
             Cursor = Cursors.Hand;
             DoubleBuffered = true;
         }
+
+        public new void Invalidate() { if (!anim.Enabled) anim.Start(); base.Invalidate(); }
 
         protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); if (e.Button == MouseButtons.Left) f.Count(); }
 
@@ -201,8 +215,7 @@ public class TasbihForm : Form
             float th = Theme.Dp(12), pad = th / 2 + 2;
             var r = new RectangleF(pad, pad, Width - 2 * pad, Height - 2 * pad);
             using (var track = new Pen(Theme.Card, th)) g.DrawEllipse(track, r);
-            var sweep = f.Target > 0 ? 360f * f.Current / f.Target : f.Current % 100 * 3.6f;
-            if (f.Current > 0)
+            if (sweep > 0.5f)
                 using (var arc = new Pen(Theme.Accent, th) { StartCap = LineCap.Round, EndCap = LineCap.Round })
                     g.DrawArc(arc, r, -90, Math.Max(sweep, 1));
             using var big = Theme.UI(36f, FontStyle.Bold);

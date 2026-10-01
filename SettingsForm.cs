@@ -4,7 +4,7 @@ public class SettingsForm : Form
 {
     public SettingsForm(Settings s, Action? testAlert = null, Func<IWin32Window, Task>? checkUpdates = null)
     {
-        Theme.Apply(this);
+        Theme.Apply(this, '\uE713');
         Text = "Namaz Times KZ — " + L.T("Settings");
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
@@ -45,6 +45,8 @@ public class SettingsForm : Form
         Row(g1, L.T("HijriAdjust"), hijri);
         var uiScale = new Stepper(s.UiScale, 80, 160, 10, v => v + "%");
         Row(g1, L.T("WindowScale"), uiScale);
+        var themeMode = new Segmented([L.T("ThemeSystem"), L.T("ThemeDark"), L.T("ThemeLight")], s.ThemeMode);
+        Row(g1, L.T("ThemeMode"), themeMode);
 
         // Notifications
         var notif = Theme.Section(L.T("Notifications"), out var g2);
@@ -177,6 +179,7 @@ public class SettingsForm : Form
             s.Fasting = (FastingMode)fasting.Selected;
             s.HijriAdjust = hijri.Value;
             s.UiScale = uiScale.Value;
+            s.ThemeMode = themeMode.Selected;
             s.Muted = !notifyOn.Checked;
             s.RemindBefore = remind.Value;
             s.Jumuah = jumuah.Checked;
@@ -214,11 +217,8 @@ public class CityPicker : Form
         ClientSize = new Size(Theme.Dp(520), Theme.Dp(520));
         Padding = new Padding(Theme.Dp(12));
 
-        var query = new TextBox
-        {
-            Dock = DockStyle.Top, PlaceholderText = L.T("SearchHint"), BackColor = Theme.Card, ForeColor = Theme.Text,
-            BorderStyle = BorderStyle.FixedSingle, Font = Theme.UI(11f),
-        };
+        var queryBox = new SearchBox(L.T("SearchHint")) { Dock = DockStyle.Top };
+        var query = queryBox.Box;
         var list = new ListBox
         {
             Dock = DockStyle.Fill, IntegralHeight = false, BackColor = Theme.Card, ForeColor = Theme.Text,
@@ -231,7 +231,7 @@ public class CityPicker : Form
         var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, Theme.Dp(8), 0, 0) };
         buttons.Controls.AddRange([cancel, choose]);
         var gap = new Panel { Dock = DockStyle.Top, Height = Theme.Dp(8) };
-        Controls.AddRange([list, gap, query, buttons]);
+        Controls.AddRange([list, gap, queryBox, buttons]);
 
         var all = Data.Cities.Value
             .Select(c => (Label: string.Join(" · ", new[] { c[0], c[2], c[1] }.Where(x => x != "")), Key: Data.Fold(c[0]), Row: c))

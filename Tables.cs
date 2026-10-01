@@ -40,7 +40,7 @@ public class MonthForm : Form
 {
     public MonthForm(Settings s)
     {
-        Theme.Apply(this);
+        Theme.Apply(this, '\uE787');
         Text = L.T("Month") + " — " + s.City.Title;
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(Theme.Dp(1000), Theme.Dp(680));
@@ -89,7 +89,7 @@ public class HolidaysForm : Form
 {
     public HolidaysForm(Settings s)
     {
-        Theme.Apply(this);
+        Theme.Apply(this, '\uE734');
         Text = L.T("Holidays");
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(Theme.Dp(900), Theme.Dp(640));
