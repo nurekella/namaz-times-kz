@@ -25,7 +25,7 @@ public static class QuranText
     {
         if (texts.TryGetValue(key, out var t)) return t;
         using var r = new StreamReader(Res($"quran/{key}.txt"));
-        return texts[key] = r.ReadToEnd().Split('\n');
+        return texts[key] = r.ReadToEnd().Split('\n').Select(l => l.TrimEnd('\r')).ToArray(); // git may check out CRLF
     }
 
     /// Verses of sura s (1-based) from Lines(key).
