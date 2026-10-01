@@ -460,7 +460,11 @@ public class Segmented : FlowLayoutPanel
         Theme.Round(this, 9);
     }
 
-    public int Selected => items.FindIndex(i => i.Checked);
+    public int Selected
+    {
+        get => items.FindIndex(i => i.Checked);
+        set => items[Math.Clamp(value, 0, items.Count - 1)].Checked = true;
+    }
 
     class Item(Segmented owner) : RadioButton
     {

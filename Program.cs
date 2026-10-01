@@ -36,6 +36,9 @@ public class Settings
     public bool ShowNameOfDay { get; set; } = true;
     public int TasbihTarget { get; set; } = -2; // -1 = the recommended count of the selected dhikr, -2 = TasbihCustom
     public int TasbihCustom { get; set; } = 500;
+    // Per-dhikr goal and own number (by position in dhikr.json); a dhikr not listed uses the two defaults above
+    public Dictionary<int, int> TasbihTargets { get; set; } = [];
+    public Dictionary<int, int> TasbihCustoms { get; set; } = [];
     public string TasbihDate { get; set; } = "";
     public int[] TasbihCounts { get; set; } = [];
     public Dictionary<P, int> Offsets { get; set; } = [];

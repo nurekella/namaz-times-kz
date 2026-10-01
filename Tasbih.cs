@@ -84,18 +84,18 @@ public class TasbihForm : Form
         hint = Block(Theme.UI(8.5f), Theme.Muted, 26);
 
         var target = new Segmented(Targets.Select(t => t switch { Recommended => L.T("TargetRecommended"), Custom => L.T("TargetCustom"), 0 => "∞", _ => t.ToString() }),
-            Math.Max(0, Array.IndexOf(Targets, s.TasbihTarget)));
+            Math.Max(0, Array.IndexOf(Targets, TargetOption)));
         var reset = Theme.Button("↺");
         var targetRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(4), 0, Theme.Dp(6)) };
         target.Margin = new Padding(0, 0, Theme.Dp(8), 0);
         // Own number: shown only while "Custom" is selected
         var custom = new NumericUpDown
         {
-            Minimum = 10, Maximum = 100_000, Value = Math.Clamp(s.TasbihCustom, 10, 100_000), Width = Theme.Dp(84), Font = Theme.UI(11f),
+            Minimum = 10, Maximum = 100_000, Value = Math.Clamp(CustomCount, 10, 100_000), Width = Theme.Dp(84), Font = Theme.UI(11f),
             BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.None, TextAlign = HorizontalAlignment.Center,
-            Margin = new Padding(0, Theme.Dp(3), Theme.Dp(8), 0), Visible = s.TasbihTarget == Custom,
+            Margin = new Padding(0, Theme.Dp(3), Theme.Dp(8), 0), Visible = TargetOption == Custom,
         };
-        custom.ValueChanged += (_, _) => { s.TasbihCustom = (int)custom.Value; n = 0; Data.Save(s); UpdateView(); };
+        custom.ValueChanged += (_, _) => { if (loading) return; s.TasbihCustoms[idx] = (int)custom.Value; n = 0; Data.Save(s); UpdateView(); };
         targetRow.Controls.AddRange([target, custom, reset]);
         total = Block(Theme.UI(10f, FontStyle.Bold), Theme.Accent, 26);
 
@@ -106,13 +106,27 @@ public class TasbihForm : Form
         root.Controls.Add(right);
         Controls.Add(root);
 
-        list.SelectedIndexChanged += (_, _) => { idx = Math.Max(0, list.SelectedIndex); n = 0; UpdateView(); };
-        target.Changed += i => { s.TasbihTarget = Targets[i]; custom.Visible = Targets[i] == Custom; n = 0; Data.Save(s); UpdateView(); };
+        // Each dhikr keeps its own goal: switching dhikr shows that dhikr's choice.
+        list.SelectedIndexChanged += (_, _) =>
+        {
+            idx = Math.Max(0, list.SelectedIndex);
+            n = 0;
+            loading = true;
+            target.Selected = Math.Max(0, Array.IndexOf(Targets, TargetOption));
+            custom.Value = Math.Clamp(CustomCount, 10, 100_000);
+            custom.Visible = TargetOption == Custom;
+            loading = false;
+            UpdateView();
+        };
+        target.Changed += i => { if (loading) return; s.TasbihTargets[idx] = Targets[i]; custom.Visible = Targets[i] == Custom; n = 0; Data.Save(s); UpdateView(); };
         reset.Click += (_, _) => { n = 0; UpdateView(); };
         list.SelectedIndex = 0;
     }
 
-    int Target => s.TasbihTarget switch { Recommended => Dhikr.All.Value[idx].Recommended, Custom => Math.Max(10, s.TasbihCustom), var t => t };
+    bool loading; // true while the controls are being set to the selected dhikr's values
+    int TargetOption => s.TasbihTargets.TryGetValue(idx, out var t) ? t : s.TasbihTarget;
+    int CustomCount => s.TasbihCustoms.TryGetValue(idx, out var c) ? c : s.TasbihCustom;
+    int Target => TargetOption switch { Recommended => Dhikr.All.Value[idx].Recommended, Custom => Math.Max(10, CustomCount), var t => t };
     int Current => n;
 
     void ResetIfNewDay()
