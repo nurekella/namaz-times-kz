@@ -108,14 +108,18 @@ public class QuranForm : Form
         // Toolbar: font, translation, show/hide transliteration and translation, Arabic size
         var bar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 0, 0, Theme.Dp(8)) };
         Label Caption(string key) { var l = Theme.Label(L.T(key), Theme.Muted, 9.5f); l.Margin = new Padding(Theme.Dp(4), Theme.Dp(8), Theme.Dp(6), 0); return l; }
-        var font = new Segmented(QuranText.Fonts.Select(f => f.Title), s.QuranFont) { Margin = new Padding(0, Theme.Dp(2), Theme.Dp(14), Theme.Dp(2)) };
+        // Font and Russian translation: buttons with a drop-down menu, to keep the toolbar on one line
+        var font = Drop(QuranText.Fonts.Select(f => f.Title).ToArray(), () => s.QuranFont, i => { s.QuranFont = i; Data.Save(s); view!.Rebuild(); });
         string[] langs = ["kk", "ru", "en"];
         // the last option hides the translation
-        var trans = new Segmented(["Қазақша", "Русский", "English", L.T("QuranNone")], s.QuranMeaning ? Array.IndexOf(langs, s.QuranTrans) : langs.Length) { Margin = new Padding(0, Theme.Dp(2), Theme.Dp(14), Theme.Dp(2)) };
+        var trans = new Segmented(["Қазақша", "Русский", "English", L.T("QuranNone")], s.QuranMeaning ? Array.IndexOf(langs, s.QuranTrans) : langs.Length) { Margin = new Padding(0, Theme.Dp(2), Theme.Dp(8), Theme.Dp(2)) };
+        string[] ru = ["muntahab", "abuadel", "kuliev"];
+        var ruButton = Drop(["Аль-Мунтахаб", "Абу Адель", "Кулиев"], () => Math.Max(0, Array.IndexOf(ru, s.QuranRu)), i => { s.QuranRu = ru[i]; Data.Save(s); view!.Rebuild(); });
+        void ShowRu() => ruButton.Visible = s.QuranMeaning && s.QuranTrans == "ru"; // shown while "Русский" is picked
         var translit = Check(L.T("QuranTranslit"), s.QuranTranslit);
         var tajweed = Check(L.T("Tajweed"), s.QuranTajweed);
         var size = new Stepper(s.QuranSize, 14, 40, 2);
-        bar.Controls.AddRange([font, trans, translit, tajweed, Caption("QuranSize"), size]); // the font and language names speak for themselves
+        bar.Controls.AddRange([font, trans, ruButton, translit, tajweed, Caption("QuranSize"), size]); // the font and language names speak for themselves
 
         // Tajweed colour legend, shown while colouring is on
         var legend = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 0, 0, Theme.Dp(8)), Visible = s.QuranTajweed };
@@ -166,8 +170,8 @@ public class QuranForm : Form
         view.Bookmarked += UpdateBookmark;
         Controls.AddRange([view, left, legend, bar, bottom]);
 
-        font.Changed += i => { s.QuranFont = i; Data.Save(s); view.Rebuild(); };
-        trans.Changed += i => { s.QuranMeaning = i < langs.Length; if (s.QuranMeaning) s.QuranTrans = langs[i]; Data.Save(s); view.Rebuild(); };
+        trans.Changed += i => { s.QuranMeaning = i < langs.Length; if (s.QuranMeaning) s.QuranTrans = langs[i]; Data.Save(s); ShowRu(); view.Rebuild(); };
+        ShowRu();
         tajweed.CheckedChanged += (_, _) => { s.QuranTajweed = legend.Visible = tajweed.Checked; Data.Save(s); view.Rebuild(); };
         translit.CheckedChanged += (_, _) => { s.QuranTranslit = translit.Checked; Data.Save(s); view.Rebuild(); };
         size.ValueChanged += v => { s.QuranSize = v; Data.Save(s); view.Rebuild(); };
@@ -182,6 +186,22 @@ public class QuranForm : Form
             if (sura == null) view.ScrollTo(s.QuranAya); // reopen at the bookmark
             UpdateBookmark();
         };
+    }
+
+    /// A button showing the current choice; clicking it opens a menu of the others.
+    static Button Drop(string[] titles, Func<int> current, Action<int> pick)
+    {
+        var b = Theme.Button(titles[current()] + "  ▾");
+        b.Margin = new Padding(0, Theme.Dp(2), Theme.Dp(8), Theme.Dp(2));
+        var menu = Theme.Menu();
+        for (int i = 0; i < titles.Length; i++)
+        {
+            int k = i;
+            menu.Items.Add(new ToolStripMenuItem(titles[i], null, (_, _) => { b.Text = titles[k] + "  ▾"; pick(k); }) { Padding = new Padding(0, Theme.Dp(5), Theme.Dp(8), Theme.Dp(5)) });
+        }
+        menu.Opening += (_, _) => { for (int i = 0; i < titles.Length; i++) ((ToolStripMenuItem)menu.Items[i]).Font = Theme.UI(10f, i == current() ? FontStyle.Bold : FontStyle.Regular); };
+        b.Click += (_, _) => menu.Show(b, new Point(0, b.Height));
+        return b;
     }
 
     static CheckBox Check(string text, bool value)
@@ -251,13 +271,14 @@ public class QuranForm : Form
         public int Sura { get; private set; } = 1;
         public event Action? Bookmarked;
         string[] ar = [], tl = [], tr = [];
+        string?[] notes = [];
         QuranText.Span[][] tj = [];
         Region?[][] tjRegions = []; // per verse, per colour group; measured lazily at the verse's own origin
         int[] tops = [], heights = [], arHeights = [];
         int headerH;
         Font? arFont;
         readonly Font tlFont = Theme.UI(10f, FontStyle.Italic), trFont = Theme.UI(11f), titleFont = Theme.UI(15f, FontStyle.Bold),
-            subFont = Theme.UI(9.5f), numFont = Theme.UI(8.5f);
+            subFont = Theme.UI(9.5f), numFont = Theme.UI(8.5f), noteFont = Theme.UI(9.5f, FontStyle.Italic);
         static readonly Color Marked = Color.FromArgb(38, 48, 42);
         int Pad => Theme.Dp(22);
         int NumW => Theme.Dp(40);
@@ -283,7 +304,16 @@ public class QuranForm : Form
         {
             ar = [.. QuranText.Verses("ar", Sura)];
             tl = s.QuranTranslit ? [.. QuranText.Verses("tl", Sura)] : [];
-            tr = s.QuranMeaning ? [.. QuranText.Verses(s.QuranTrans, Sura)] : [];
+            tr = s.QuranMeaning ? [.. QuranText.Verses(s.QuranTrans == "ru" ? "ru-" + s.QuranRu : s.QuranTrans, Sura)] : [];
+            // Al-Muntakhab puts a sura introduction in [[...]] inside a verse: shown under it as a grey note
+            notes = new string[tr.Length];
+            for (int k = 0; k < tr.Length; k++)
+            {
+                int a = tr[k].IndexOf("[["), b = tr[k].IndexOf("]]");
+                if (a < 0 || b < a) continue;
+                notes[k] = tr[k][(a + 2)..b].Trim();
+                tr[k] = (tr[k][..a] + tr[k][(b + 2)..]).Trim();
+            }
             tj = s.QuranTajweed ? QuranText.TajweedOf(Sura) : [];
             arFont?.Dispose();
             arFont = new Font(QuranText.Family(s.QuranFont), s.QuranSize * Theme.UiScale);
@@ -367,6 +397,7 @@ public class QuranForm : Form
                 int h = Theme.Dp(14) + arHeights[i];
                 if (tl.Length > 0) h += gap + H(tl[i], tlFont, Wrap);
                 if (tr.Length > 0) h += gap + H(tr[i], trFont, Wrap);
+                if (tr.Length > 0 && notes[i] != null) h += gap + H(notes[i]!, noteFont, Wrap);
                 h += Theme.Dp(16);
                 tops[i] = y;
                 heights[i] = h;
@@ -453,6 +484,13 @@ public class QuranForm : Form
                     y += gap;
                     h = H(tr[i], trFont, Wrap);
                     TextRenderer.DrawText(g, tr[i], trFont, new Rectangle(x, y, TextW, h), Theme.Text, Wrap);
+                    y += h;
+                    if (notes[i] != null)
+                    {
+                        y += gap;
+                        h = H(notes[i]!, noteFont, Wrap);
+                        TextRenderer.DrawText(g, notes[i]!, noteFont, new Rectangle(x, y, TextW, h), Theme.Muted, Wrap);
+                    }
                 }
             }
         }

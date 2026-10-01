@@ -5,6 +5,8 @@
 //           https://github.com/cpfair/quran-tajweed/files/7281388/quran-uthmani.txt
 //           (today's https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt-2 writes some hamzas differently)
 //   tajweed.json https://raw.githubusercontent.com/cpfair/quran-tajweed/master/output/tajweed.hafs.uthmani-pause-sajdah.json (CC BY 4.0)
+//   ru.muntahab.txt https://tanzil.net/trans/ru.muntahab (Al-Muntakhab, Ministry of Awqaf of Egypt / al-Azhar)
+//   ru.abuadel.txt  https://tanzil.net/trans/ru.abuadel  (Abu Adel)
 //   ru.txt  https://tanzil.net/trans/ru.kuliev       (Elmir Kuliev)
 //   en.txt  https://tanzil.net/trans/en.sahih        (Saheeh International)
 //   tr.json https://api.alquran.cloud/v1/quran/en.transliteration
@@ -24,7 +26,9 @@ const tr = JSON.parse(fs.readFileSync(path.join(src, 'tr.json'), 'utf8')).data.s
 
 const files = {
   ar: tanzil('ar.txt'),
-  ru: tanzil('ru.txt'),
+  'ru-muntahab': tanzil('ru.muntahab.txt'),
+  'ru-abuadel': tanzil('ru.abuadel.txt'),
+  'ru-kuliev': tanzil('ru.txt'),
   en: tanzil('en.txt'),
   kk: Object.keys(kk).sort((a, b) => a - b).flatMap(s => kk[s].map(a => clean(a.translation))),
   tl: tr.flatMap(s => s.ayahs.map(a => clean(a.text))),

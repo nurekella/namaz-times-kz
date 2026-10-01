@@ -62,6 +62,7 @@ public class Settings
     // Quran reader
     public int QuranFont { get; set; } // index into QuranText.Fonts
     public string QuranTrans { get; set; } = ""; // kk/ru/en; empty = the app language
+    public string QuranRu { get; set; } = "muntahab"; // Russian translation: muntahab / abuadel / kuliev
     public bool QuranTranslit { get; set; } = true;
     public bool QuranTajweed { get; set; } = true;
     public bool QuranMeaning { get; set; } = true;
