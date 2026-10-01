@@ -59,6 +59,14 @@ public class Settings
     public ZakatInput Zakat { get; set; } = new();
     public string AdhkarDate { get; set; } = "";
     public Dictionary<string, int> AdhkarCounts { get; set; } = []; // today's morning/evening adhkar progress
+    // Quran reader
+    public int QuranFont { get; set; } // index into QuranText.Fonts
+    public string QuranTrans { get; set; } = ""; // kk/ru/en; empty = the app language
+    public bool QuranTranslit { get; set; } = true;
+    public bool QuranMeaning { get; set; } = true;
+    public int QuranSize { get; set; } = 22; // Arabic font size, pt
+    public int QuranSura { get; set; } = 1; // bookmark
+    public int QuranAya { get; set; } = 1;
     public int Opacity { get; set; } = 100;
     public int X { get; set; } = -1;
     public int Y { get; set; } = -1;

@@ -10,7 +10,7 @@ public class Widget : Form
     readonly Settings s;
     readonly NotifyIcon tray;
     readonly System.Windows.Forms.Timer timer = new() { Interval = 1000 };
-    readonly ToolStripMenuItem showItem, monthItem, holidaysItem, tasbihItem, adhkarItem, namesItem, typesItem, qadaItem, zakatItem, muteItem, settingsItem, checkUpdateItem, updateItem, exitItem;
+    readonly ToolStripMenuItem showItem, monthItem, holidaysItem, quranItem, tasbihItem, adhkarItem, namesItem, typesItem, qadaItem, zakatItem, muteItem, settingsItem, checkUpdateItem, updateItem, exitItem;
     readonly List<(RectangleF R, P P)> bells = [];
     DateTime lastTick = Clock(), lastUpdateCheck;
     DateOnly shownDate;
@@ -32,6 +32,7 @@ public class Widget : Form
     QadaForm? qadaForm;
     AdhkarForm? adhkarForm;
     ZakatForm? zakatForm;
+    QuranForm? quranForm;
     RectangleF nameCard; // "name of the day" card, clickable
     bool full, hover;          // fullscreen mode; mouse over widget (shows window buttons)
     int hot = -1, fullZoom = 100;
@@ -61,6 +62,7 @@ public class Widget : Form
         showItem = Theme.MenuItem('', (_, _) => SetWidgetVisible(!Visible));
         monthItem = Theme.MenuItem('', (_, _) => Open(ref monthForm, () => new MonthForm(s)));
         holidaysItem = Theme.MenuItem('', (_, _) => Open(ref holidaysForm, () => new HolidaysForm(s)));
+        quranItem = Theme.MenuItem('', (_, _) => OpenQuran()); // Library
         tasbihItem = Theme.MenuItem('', (_, _) => OpenTasbih()); // RadioBullet, a bead
         adhkarItem = Theme.MenuItem('', (_, _) => OpenAdhkar()); // Brightness (sun)
         zakatItem = Theme.MenuItem('', (_, _) => OpenZakat());   // PaymentCard
@@ -73,7 +75,7 @@ public class Widget : Form
         updateItem = Theme.MenuItem('', (_, _) => _ = InstallUpdate());
         updateItem.Visible = false;
         exitItem = Theme.MenuItem('', (_, _) => { tray!.Visible = false; Application.Exit(); });
-        menu.Items.AddRange([showItem, monthItem, holidaysItem, tasbihItem, adhkarItem, namesItem, typesItem, qadaItem, zakatItem, new ToolStripSeparator(), muteItem, settingsItem, checkUpdateItem, updateItem,
+        menu.Items.AddRange([showItem, monthItem, holidaysItem, quranItem, tasbihItem, adhkarItem, namesItem, typesItem, qadaItem, zakatItem, new ToolStripSeparator(), muteItem, settingsItem, checkUpdateItem, updateItem,
             new ToolStripSeparator(), exitItem]);
         menu.Opening += (_, _) => { showItem.Checked = Visible; muteItem.Checked = s.Muted; };
         ContextMenuStrip = menu;
@@ -107,6 +109,7 @@ public class Widget : Form
         showItem.Text = L.T("ShowWidget");
         monthItem.Text = L.T("Month");
         holidaysItem.Text = L.T("Holidays");
+        quranItem.Text = L.T("Quran");
         tasbihItem.Text = L.T("Tasbih");
         namesItem.Text = L.T("Names99");
         typesItem.Text = L.T("PrayerTypes");
@@ -280,10 +283,10 @@ public class Widget : Form
             if (s.RemindHolidays && holiday is { Night: true } nh && crossed(maghrib.AddMinutes(5)))
                 Notify(string.Format(L.T("HolidayTonight"), L.T(nh.Key)), place);
             if (s.RemindKahf && date.DayOfWeek == DayOfWeek.Thursday && crossed(maghrib.AddMinutes(10)))
-                Notify(L.T("KahfTitle"), L.T("KahfText"));
+                Notify(L.T("KahfTitle"), L.T("KahfText"), () => OpenQuran(18));
         }
         if (s.RemindKahf && date.DayOfWeek == DayOfWeek.Friday && Find(today, P.Sunrise) is { } sunrise && crossed(sunrise.AddMinutes(60)))
-            Notify(L.T("KahfTitle"), L.T("KahfText"));
+            Notify(L.T("KahfTitle"), L.T("KahfText"), () => OpenQuran(18));
         if (s.RemindAdhkar && Find(today, P.Fajr) is { } fajr && crossed(fajr.AddMinutes(15)))
             Notify(L.T("AdhkarMorningTitle"), L.T("AdhkarTap"), () => OpenAdhkar(true));
         if (s.RemindAdhkar && Find(today, P.Asr) is { } asr && crossed(asr.AddMinutes(15)))
@@ -745,6 +748,12 @@ public class Widget : Form
     void OpenTypes() => Open(ref typesForm, () => new PrayerTypesForm());
     void OpenQada() => Open(ref qadaForm, () => new QadaForm(s));
     void OpenZakat() => Open(ref zakatForm, () => new ZakatForm(s));
+    void OpenQuran(int? sura = null)
+    {
+        if (sura != null) quranForm?.Close(); // a reminder opens the reader on its sura
+        Open(ref quranForm, () => new QuranForm(s, sura));
+    }
+
     void OpenAdhkar(bool? morning = null)
     {
         adhkarForm?.Close(); // reopen on the requested tab (morning / evening)
