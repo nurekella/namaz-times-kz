@@ -9,7 +9,7 @@
     <AssemblyName>NamazTimes</AssemblyName>
     <Product>Namaz Times KZ</Product>
     <AssemblyTitle>Namaz Times KZ</AssemblyTitle>
-    <Version>0.7.0</Version>
+    <Version>0.7.1</Version>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <!-- No designer in this project; controls are built in code. -->
@@ -23,6 +23,7 @@
     <EmbeddedResource Include="prayers.json" LogicalName="prayers.json" />
     <EmbeddedResource Include="dhikr.json" LogicalName="dhikr.json" />
     <EmbeddedResource Include="adhkar.json" LogicalName="adhkar.json" />
+    <EmbeddedResource Include="changelog.json" LogicalName="changelog.json" />
     <EmbeddedResource Include="quran/*" LogicalName="quran/%(Filename)%(Extension)" />
     <EmbeddedResource Include="fonts/*.ttf" LogicalName="fonts/%(Filename)%(Extension)" />
     <!-- CI passes -p:GitHubRepo=owner/name so the app can check Releases for updates. -->

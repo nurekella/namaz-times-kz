@@ -301,6 +301,10 @@ static class Program
         z.Cash = 1_000_000; z.Debts = 800_000;
         Trace.Assert(ZakatForm.Due(z) == 0, "debts bring it below nisab");
         Trace.Assert(ZakatForm.Due(new ZakatInput { Cash = 1_000_000, NisabBasis = 1 }) == 0, "unknown nisab: no answer");
+        // the changelog must start with the version being built (the "What's new" window marks it as current)
+        var log = System.Text.Json.JsonDocument.Parse(typeof(Data).Assembly.GetManifestResourceStream("changelog.json")!);
+        Trace.Assert(log.RootElement[0].GetProperty("v").GetString() == Updates.Current.ToString(3), "changelog.json is missing this version");
+        Trace.Assert(QuranText.Lines("ar").Length == 6236 && QuranText.Lines("kk").All(l => l.Length > 0 && !l.EndsWith('\r')), "quran texts");
         Console.WriteLine("selftest ok");
         return 0;
     }

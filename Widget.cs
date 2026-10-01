@@ -10,7 +10,7 @@ public class Widget : Form
     readonly Settings s;
     readonly NotifyIcon tray;
     readonly System.Windows.Forms.Timer timer = new() { Interval = 1000 };
-    readonly ToolStripMenuItem showItem, monthItem, holidaysItem, quranItem, tasbihItem, adhkarItem, namesItem, typesItem, qadaItem, zakatItem, muteItem, settingsItem, checkUpdateItem, updateItem, exitItem;
+    readonly ToolStripMenuItem showItem, monthItem, holidaysItem, quranItem, tasbihItem, adhkarItem, namesItem, typesItem, qadaItem, zakatItem, muteItem, settingsItem, checkUpdateItem, updateItem, aboutItem, newsItem, exitItem;
     readonly List<(RectangleF R, P P)> bells = [];
     DateTime lastTick = Clock(), lastUpdateCheck;
     DateOnly shownDate;
@@ -33,6 +33,8 @@ public class Widget : Form
     AdhkarForm? adhkarForm;
     ZakatForm? zakatForm;
     QuranForm? quranForm;
+    AboutForm? aboutForm;
+    NewsForm? newsForm;
     RectangleF nameCard; // "name of the day" card, clickable
     bool full, hover;          // fullscreen mode; mouse over widget (shows window buttons)
     int hot = -1, fullZoom = 100;
@@ -74,8 +76,10 @@ public class Widget : Form
         checkUpdateItem = Theme.MenuItem('', (_, _) => _ = CheckUpdatesNow()); // Sync
         updateItem = Theme.MenuItem('', (_, _) => _ = InstallUpdate());
         updateItem.Visible = false;
+        aboutItem = Theme.MenuItem('', (_, _) => Open(ref aboutForm, () => new AboutForm(OpenNews))); // Info
+        newsItem = Theme.MenuItem('', (_, _) => OpenNews()); // QuickNote
         exitItem = Theme.MenuItem('', (_, _) => { tray!.Visible = false; Application.Exit(); });
-        menu.Items.AddRange([showItem, monthItem, holidaysItem, quranItem, tasbihItem, adhkarItem, namesItem, typesItem, qadaItem, zakatItem, new ToolStripSeparator(), muteItem, settingsItem, checkUpdateItem, updateItem,
+        menu.Items.AddRange([showItem, monthItem, holidaysItem, quranItem, tasbihItem, adhkarItem, namesItem, typesItem, qadaItem, zakatItem, new ToolStripSeparator(), muteItem, settingsItem, checkUpdateItem, updateItem, newsItem, aboutItem,
             new ToolStripSeparator(), exitItem]);
         menu.Opening += (_, _) => { showItem.Checked = Visible; muteItem.Checked = s.Muted; };
         ContextMenuStrip = menu;
@@ -119,6 +123,8 @@ public class Widget : Form
         muteItem.Text = L.T("Mute");
         settingsItem.Text = L.T("Settings");
         checkUpdateItem.Text = L.T("CheckUpdates");
+        aboutItem.Text = L.T("About");
+        newsItem.Text = L.T("News");
         exitItem.Text = L.T("Exit");
         TopMost = s.TopMost;
         Opacity = Math.Clamp(s.Opacity, 30, 100) / 100.0;
@@ -748,6 +754,8 @@ public class Widget : Form
     void OpenTypes() => Open(ref typesForm, () => new PrayerTypesForm());
     void OpenQada() => Open(ref qadaForm, () => new QadaForm(s));
     void OpenZakat() => Open(ref zakatForm, () => new ZakatForm(s));
+    void OpenNews() => Open(ref newsForm, () => new NewsForm());
+
     void OpenQuran(int? sura = null)
     {
         if (sura != null) quranForm?.Close(); // a reminder opens the reader on its sura
