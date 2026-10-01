@@ -35,6 +35,20 @@ public static class QuranText
         return new ArraySegment<string>(Lines(key), start, Suras.Value[s - 1].N);
     }
 
+    /// Tajweed colour groups (tajweed.txt stores "group start end;..." per verse, offsets into the "ar" line).
+    public static readonly (Color Color, string Key)[] Tajweed =
+    [
+        (Color.FromArgb(138, 145, 156), "TjSilent"), (Color.FromArgb(232, 176, 74), "TjMadd2"), (Color.FromArgb(240, 138, 60), "TjMaddJaiz"),
+        (Color.FromArgb(232, 87, 63), "TjMaddWajib"), (Color.FromArgb(255, 77, 109), "TjMaddLazim"), (Color.FromArgb(79, 163, 255), "TjQalqala"),
+        (Color.FromArgb(60, 207, 110), "TjGhunna"), (Color.FromArgb(42, 179, 160), "TjIdgham"), (Color.FromArgb(199, 125, 255), "TjIkhfa"),
+        (Color.FromArgb(46, 196, 230), "TjIqlab"),
+    ];
+
+    public record struct Span(int Group, int Start, int End);
+
+    public static Span[][] TajweedOf(int s) => [.. Verses("tajweed", s).Select(line => line.Split(';', StringSplitOptions.RemoveEmptyEntries)
+        .Select(t => t.Split(' ')).Select(p => new Span(int.Parse(p[0]), int.Parse(p[1]), int.Parse(p[2]))).ToArray())];
+
     static Stream Res(string name) => typeof(QuranText).Assembly.GetManifestResourceStream(name)!;
 
     // Fonts: GDI+ (Font objects) reads them from a PrivateFontCollection; GDI text drawing (TextRenderer)
@@ -87,7 +101,7 @@ public class QuranForm : Form
         Theme.Apply(this);
         Text = L.T("Quran");
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(Theme.Dp(1100), Theme.Dp(760));
+        ClientSize = new Size(Theme.Dp(1180), Theme.Dp(780));
         MinimumSize = new Size(Theme.Dp(760), Theme.Dp(480));
         Padding = new Padding(Theme.Dp(12));
 
@@ -99,8 +113,22 @@ public class QuranForm : Form
         // the last option hides the translation
         var trans = new Segmented(["Қазақша", "Русский", "English", L.T("QuranNone")], s.QuranMeaning ? Array.IndexOf(langs, s.QuranTrans) : langs.Length) { Margin = new Padding(0, Theme.Dp(2), Theme.Dp(14), Theme.Dp(2)) };
         var translit = Check(L.T("QuranTranslit"), s.QuranTranslit);
+        var tajweed = Check(L.T("Tajweed"), s.QuranTajweed);
         var size = new Stepper(s.QuranSize, 14, 40, 2);
-        bar.Controls.AddRange([Caption("QuranFont"), font, Caption("QuranTranslation"), trans, translit, Caption("QuranSize"), size]);
+        bar.Controls.AddRange([font, trans, translit, tajweed, Caption("QuranSize"), size]); // the font and language names speak for themselves
+
+        // Tajweed colour legend, shown while colouring is on
+        var legend = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 0, 0, Theme.Dp(8)), Visible = s.QuranTajweed };
+        foreach (var (color, key) in QuranText.Tajweed)
+        {
+            var chip = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Theme.Card, Margin = new Padding(0, 0, Theme.Dp(5), Theme.Dp(5)), Padding = new Padding(Theme.Dp(4), Theme.Dp(1), Theme.Dp(6), Theme.Dp(1)) };
+            var dot = Theme.Label("●", color, 10f);
+            dot.Margin = new Padding(0, Theme.Dp(3), Theme.Dp(4), Theme.Dp(3));
+            var name = Theme.Label(L.T(key), Theme.Text, 8.5f);
+            name.Margin = new Padding(0, Theme.Dp(5), 0, Theme.Dp(3));
+            chip.Controls.AddRange([dot, name]);
+            legend.Controls.Add(chip);
+        }
 
         // Left: search + sura list
         search = new TextBox
@@ -136,10 +164,11 @@ public class QuranForm : Form
 
         view = new VerseView(s) { Dock = DockStyle.Fill };
         view.Bookmarked += UpdateBookmark;
-        Controls.AddRange([view, left, bar, bottom]);
+        Controls.AddRange([view, left, legend, bar, bottom]);
 
         font.Changed += i => { s.QuranFont = i; Data.Save(s); view.Rebuild(); };
         trans.Changed += i => { s.QuranMeaning = i < langs.Length; if (s.QuranMeaning) s.QuranTrans = langs[i]; Data.Save(s); view.Rebuild(); };
+        tajweed.CheckedChanged += (_, _) => { s.QuranTajweed = legend.Visible = tajweed.Checked; Data.Save(s); view.Rebuild(); };
         translit.CheckedChanged += (_, _) => { s.QuranTranslit = translit.Checked; Data.Save(s); view.Rebuild(); };
         size.ValueChanged += v => { s.QuranSize = v; Data.Save(s); view.Rebuild(); };
         search.TextChanged += (_, _) => Filter();
@@ -222,7 +251,9 @@ public class QuranForm : Form
         public int Sura { get; private set; } = 1;
         public event Action? Bookmarked;
         string[] ar = [], tl = [], tr = [];
-        int[] tops = [], heights = [];
+        QuranText.Span[][] tj = [];
+        Region?[][] tjRegions = []; // per verse, per colour group; measured lazily at the verse's own origin
+        int[] tops = [], heights = [], arHeights = [];
         int headerH;
         Font? arFont;
         readonly Font tlFont = Theme.UI(10f, FontStyle.Italic), trFont = Theme.UI(11f), titleFont = Theme.UI(15f, FontStyle.Bold),
@@ -253,6 +284,7 @@ public class QuranForm : Form
             ar = [.. QuranText.Verses("ar", Sura)];
             tl = s.QuranTranslit ? [.. QuranText.Verses("tl", Sura)] : [];
             tr = s.QuranMeaning ? [.. QuranText.Verses(s.QuranTrans, Sura)] : [];
+            tj = s.QuranTajweed ? QuranText.TajweedOf(Sura) : [];
             arFont?.Dispose();
             arFont = new Font(QuranText.Family(s.QuranFont), s.QuranSize * Theme.UiScale);
             Measure();
@@ -261,9 +293,64 @@ public class QuranForm : Form
         int TextW => Math.Max(Theme.Dp(200), ClientSize.Width - 2 * Pad - NumW);
 
         static TextFormatFlags Wrap => TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.TextBoxControl;
-        static TextFormatFlags ArFlags => Wrap | TextFormatFlags.RightToLeft | TextFormatFlags.Right;
 
         int H(string text, Font f, TextFormatFlags flags) => TextRenderer.MeasureText(text, f, new Size(TextW, int.MaxValue), flags).Height;
+
+        // Arabic goes through GDI+ (DrawString): it can measure where each letter landed after shaping,
+        // which is what tajweed colouring needs. Translations stay on GDI (TextRenderer).
+        static readonly StringFormat ArFormat = new(StringFormatFlags.DirectionRightToLeft);
+        Graphics? measure;
+        Graphics M => measure ??= CreateGraphics();
+        int ArH(string text) => (int)Math.Ceiling(M.MeasureString(text, arFont!, TextW, ArFormat).Height);
+
+        /// Union of the areas of each tajweed group's letters, for a verse laid out at (0, 0).
+        Region?[] Regions(int i, int h)
+        {
+            if (tjRegions[i] is { } done) return done;
+            var result = new Region?[QuranText.Tajweed.Length];
+            var rect = new RectangleF(0, 0, TextW, h);
+            foreach (var group in tj[i].GroupBy(t => t.Group))
+                foreach (var chunk in group.Chunk(32)) // GDI+ measures at most 32 ranges per call
+                {
+                    using var f = (StringFormat)ArFormat.Clone();
+                    f.SetMeasurableCharacterRanges([.. chunk.Select(t => new CharacterRange(t.Start, Math.Max(1, Math.Min(t.End, ar[i].Length) - t.Start)))]);
+                    foreach (var r in M.MeasureCharacterRanges(ar[i], arFont!, rect, f))
+                    {
+                        if (result[group.Key] is { } u) { u.Union(r); r.Dispose(); } else result[group.Key] = r;
+                    }
+                }
+            return tjRegions[i] = result;
+        }
+
+        void DrawArabic(Graphics g, int i, int x, int y, int h)
+        {
+            var rect = new RectangleF(0, 0, TextW, h);
+            var state = g.Save();
+            g.TranslateTransform(x, y);
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+            using var text = new SolidBrush(Theme.Text);
+            if (tj.Length == 0) { g.DrawString(ar[i], arFont!, text, rect, ArFormat); g.Restore(state); return; }
+            // Each pixel is drawn once: plain text outside the coloured letters, each colour inside its own area
+            // (drawing colour over white would leave white anti-aliasing fringes).
+            var regions = Regions(i, h);
+            using (var rest = new Region(rect))
+            {
+                foreach (var r in regions) if (r != null) rest.Exclude(r);
+                g.SetClip(rest, System.Drawing.Drawing2D.CombineMode.Intersect);
+                g.DrawString(ar[i], arFont!, text, rect, ArFormat);
+            }
+            for (int k = 0; k < regions.Length; k++)
+            {
+                if (regions[k] == null) continue;
+                g.Restore(state);
+                state = g.Save();
+                g.TranslateTransform(x, y);
+                g.SetClip(regions[k]!, System.Drawing.Drawing2D.CombineMode.Intersect);
+                using var b = new SolidBrush(QuranText.Tajweed[k].Color);
+                g.DrawString(ar[i], arFont!, b, rect, ArFormat);
+            }
+            g.Restore(state);
+        }
 
         void Measure()
         {
@@ -271,9 +358,13 @@ public class QuranForm : Form
             int gap = Theme.Dp(6), y = headerH = Theme.Dp(78);
             tops = new int[ar.Length];
             heights = new int[ar.Length];
+            arHeights = new int[ar.Length];
+            foreach (var row in tjRegions) foreach (var r in row ?? []) r?.Dispose();
+            tjRegions = new Region?[ar.Length][];
             for (int i = 0; i < ar.Length; i++)
             {
-                int h = Theme.Dp(14) + H(ar[i], arFont, ArFlags);
+                arHeights[i] = ArH(ar[i]);
+                int h = Theme.Dp(14) + arHeights[i];
                 if (tl.Length > 0) h += gap + H(tl[i], tlFont, Wrap);
                 if (tr.Length > 0) h += gap + H(tr[i], trFont, Wrap);
                 h += Theme.Dp(16);
@@ -347,8 +438,8 @@ public class QuranForm : Form
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
 
                 int y = top + Theme.Dp(14);
-                int h = H(ar[i], arFont, ArFlags);
-                TextRenderer.DrawText(g, ar[i], arFont, new Rectangle(x, y, TextW, h), Theme.Text, ArFlags);
+                int h = arHeights[i];
+                DrawArabic(g, i, x, y, h);
                 y += h;
                 if (tl.Length > 0)
                 {

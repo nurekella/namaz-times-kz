@@ -63,6 +63,7 @@ public class Settings
     public int QuranFont { get; set; } // index into QuranText.Fonts
     public string QuranTrans { get; set; } = ""; // kk/ru/en; empty = the app language
     public bool QuranTranslit { get; set; } = true;
+    public bool QuranTajweed { get; set; } = true;
     public bool QuranMeaning { get; set; } = true;
     public int QuranSize { get; set; } = 22; // Arabic font size, pt
     public int QuranSura { get; set; } = 1; // bookmark

@@ -1,7 +1,10 @@
 // Builds quran/*.txt (one verse per line, 6236 lines, in order) and quran/suras.json from downloaded sources.
 // Usage: node tools/quran.mjs <download dir>
 // The download dir must hold:
-//   ar.txt  https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt-2&agree=true  (Tanzil Uthmani, CC BY 3.0, verbatim)
+//   ar.txt  Tanzil Uthmani (CC BY 3.0, verbatim) — the April 2017 copy the tajweed offsets were made for:
+//           https://github.com/cpfair/quran-tajweed/files/7281388/quran-uthmani.txt
+//           (today's https://tanzil.net/pub/download/index.php?quranType=uthmani&outType=txt-2 writes some hamzas differently)
+//   tajweed.json https://raw.githubusercontent.com/cpfair/quran-tajweed/master/output/tajweed.hafs.uthmani-pause-sajdah.json (CC BY 4.0)
 //   ru.txt  https://tanzil.net/trans/ru.kuliev       (Elmir Kuliev)
 //   en.txt  https://tanzil.net/trans/en.sahih        (Saheeh International)
 //   tr.json https://api.alquran.cloud/v1/quran/en.transliteration
@@ -26,6 +29,21 @@ const files = {
   kk: Object.keys(kk).sort((a, b) => a - b).flatMap(s => kk[s].map(a => clean(a.translation))),
   tl: tr.flatMap(s => s.ayahs.map(a => clean(a.text))),
 };
+// Tajweed rules → colour groups (QuranText.Tajweed in Quran.cs): "group start end;..." per verse.
+const groups = {
+  hamzat_wasl: 0, lam_shamsiyyah: 0, silent: 0, madd_2: 1, madd_246: 2, madd_munfasil: 2, madd_muttasil: 3, madd_6: 4, qalqalah: 5,
+  ghunnah: 6, idghaam_ghunnah: 6, idghaam_shafawi: 6, idghaam_no_ghunnah: 7, idghaam_mutajanisayn: 7, idghaam_mutaqaribayn: 7,
+  ikhfa: 8, ikhfa_shafawi: 8, iqlab: 9,
+};
+const tajweed = JSON.parse(fs.readFileSync(path.join(src, 'tajweed.json'), 'utf8'));
+files.tajweed = tajweed.map((v, i) => {
+  if (v.annotations.some(a => a.end > [...files.ar[i]].length)) throw new Error(`tajweed ${v.surah}:${v.ayah} out of range`);
+  return v.annotations.map(a => {
+    if (!(a.rule in groups)) throw new Error(`unknown rule ${a.rule}`);
+    return `${groups[a.rule]} ${a.start} ${a.end}`;
+  }).join(';');
+});
+
 for (const [k, lines] of Object.entries(files)) {
   if (lines.length !== 6236) throw new Error(`${k}: ${lines.length} verses`);
   fs.writeFileSync(path.join(out, `${k}.txt`), lines.join('\n'));
