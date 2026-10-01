@@ -90,7 +90,7 @@ public class TasbihForm : Form
         // Own number: shown only while "Custom" is selected
         var custom = new NumericUpDown
         {
-            Minimum = 1, Maximum = 100_000, Value = Math.Clamp(s.TasbihCustom, 1, 100_000), Width = Theme.Dp(84), Font = Theme.UI(11f),
+            Minimum = 10, Maximum = 100_000, Value = Math.Clamp(s.TasbihCustom, 10, 100_000), Width = Theme.Dp(84), Font = Theme.UI(11f),
             BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, TextAlign = HorizontalAlignment.Center,
             Margin = new Padding(0, Theme.Dp(3), Theme.Dp(8), 0), Visible = s.TasbihTarget == Custom,
         };
@@ -111,7 +111,7 @@ public class TasbihForm : Form
         list.SelectedIndex = 0;
     }
 
-    int Target => s.TasbihTarget switch { Recommended => Dhikr.All.Value[idx].Recommended, Custom => s.TasbihCustom, var t => t };
+    int Target => s.TasbihTarget switch { Recommended => Dhikr.All.Value[idx].Recommended, Custom => Math.Max(10, s.TasbihCustom), var t => t };
     int Current => n;
 
     void ResetIfNewDay()
