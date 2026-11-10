@@ -118,6 +118,8 @@ public static class L
         ["Quran"] = ("Құран", "Коран", "Quran"),
         ["QuranTranslit"] = ("Транскрипция", "Транскрипция", "Transliteration"),
         ["TjColours"] = ("Түстер", "Цвета", "Colours"),
+        ["Appearance"] = ("Көрініс", "Внешний вид", "Appearance"),
+        ["Backup"] = ("Сақтық көшірме", "Резервная копия", "Backup"),
         ["ThemeMode"] = ("Тақырып", "Тема", "Theme"),
         ["ThemeSystem"] = ("Windows сияқты", "Как в Windows", "Like Windows"),
         ["ThemeDark"] = ("Қараңғы", "Тёмная", "Dark"),

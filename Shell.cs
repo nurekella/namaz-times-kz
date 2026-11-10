@@ -7,7 +7,7 @@ public class MainWindow : Form
     record Page(string Key, char Glyph, string TitleKey, Func<Form> Make);
 
     readonly Settings s;
-    readonly Action openSettings;
+    readonly Func<Form> makeSettings;
     readonly Page[] pages;
     readonly Dictionary<string, Form> made = [];
     readonly ListBox nav;
@@ -17,10 +17,10 @@ public class MainWindow : Form
     public string Current => current;
     const string SettingsKey = "settings";
 
-    public MainWindow(Settings settings, Action openSettings)
+    public MainWindow(Settings settings, Func<Form> makeSettings)
     {
         s = settings;
-        this.openSettings = openSettings;
+        this.makeSettings = makeSettings;
         pages =
         [
             new("quran", '', "Quran", () => new QuranForm(s)),
@@ -34,7 +34,7 @@ public class MainWindow : Form
             new("holidays", '', "Holidays", () => new HolidaysForm(s)),
             new("news", '', "News", () => new NewsForm()),
             new("about", '', "About", () => new AboutForm(() => ShowPage("news"))),
-            new(SettingsKey, '', "Settings", () => null!), // opens the settings window
+            new(SettingsKey, '', "Settings", () => this.makeSettings()),
         ];
 
         Theme.Apply(this);
@@ -101,7 +101,6 @@ public class MainWindow : Form
     /// Show a section. With make, the page is rebuilt (e.g. the reader opened on a given surah).
     public void ShowPage(string key, Func<Form>? make = null)
     {
-        if (key == SettingsKey) { openSettings(); return; }
         var page = pages.First(p => p.Key == key);
         if (make != null && made.Remove(key, out var old)) old.Dispose();
         if (!made.TryGetValue(key, out var form))

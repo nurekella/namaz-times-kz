@@ -23,7 +23,6 @@ public class Widget : Form
     RectangleF cityRect;   // location in the header, click = choose city
     bool hotCity;
     Action? balloonAction;     // what clicking the last notification does (install update, open adhkar...)
-    SettingsForm? settingsForm;
     MainWindow? main; // every section lives in one window, like Windows Settings
     RectangleF nameCard; // "name of the day" card, clickable
     bool full, hover;          // fullscreen mode; mouse over widget (shows window buttons)
@@ -736,7 +735,7 @@ public class Widget : Form
     // The main window must not end up behind the widget when the widget is "always on top".
     void Page(string key, Func<Form>? make = null)
     {
-        if (main is not { IsDisposed: false }) main = new MainWindow(s, OpenSettings);
+        if (main is not { IsDisposed: false }) main = new MainWindow(s, () => new SettingsForm(s, SettingsChanged, TestAlert, CheckUpdatesNow));
         main.TopMost = TopMost;
         main.ShowPage(key, make);
     }
@@ -751,19 +750,25 @@ public class Widget : Form
     void OpenQuran(int? sura = null) => Page("quran", sura == null ? null : () => new QuranForm(s, sura));
     void OpenAdhkar(bool? morning = null) => Page("adhkar", morning == null ? null : () => new AdhkarForm(s, morning));
 
-    void OpenSettings()
+    void OpenSettings() => Page("settings");
+
+    /// Called by the settings page after every change (it applies at once, like Windows Settings).
+    void SettingsChanged(bool rebuild)
     {
-        if (settingsForm is { IsDisposed: false }) { settingsForm.Activate(); return; }
-        settingsForm = new SettingsForm(s, TestAlert, CheckUpdatesNow) { TopMost = TopMost };
-        settingsForm.FormClosed += (_, _) =>
+        Data.Save(s);
+        shownDate = default; // re-evaluate holiday with new hijri adjustment
+        ApplySettings();
+        // Language, theme and window scale are baked into the controls: rebuild the main window on the same page.
+        if (rebuild && main is { IsDisposed: false, Current: var page })
         {
-            if (settingsForm.DialogResult != DialogResult.OK) return;
-            Data.Save(s);
-            shownDate = default; // re-evaluate holiday with new hijri adjustment
-            ApplySettings();
-            if (main is { IsDisposed: false, Visible: true, Current: var page }) { main.Close(); main = null; Page(page); } // rebuild in the new theme and language
-        };
-        settingsForm.Show();
+            var bounds = main.Bounds;
+            var state = main.WindowState;
+            main.Close();
+            main = null;
+            Page(page);
+            main!.WindowState = state;
+            if (state == FormWindowState.Normal) main.Bounds = bounds;
+        }
     }
 
     const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";

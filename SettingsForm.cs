@@ -1,132 +1,128 @@
 namespace NamazTimes;
 
+/// Settings page, laid out like Windows 11 Settings: groups of setting cards in one column
+/// (title and hint on the left, the control on the right). Every change applies at once — no Save button.
 public class SettingsForm : Form
 {
-    public SettingsForm(Settings s, Action? testAlert = null, Func<IWin32Window, Task>? checkUpdates = null)
-    {
-        Theme.Apply(this, '\uE713');
-        Text = "Namaz Times KZ — " + L.T("Settings");
-        StartPosition = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.FixedSingle;
-        MaximizeBox = false;
-        AutoSize = true;
-        AutoSizeMode = AutoSizeMode.GrowAndShrink;
+    readonly Settings s;
+    readonly Action<bool> changed; // true = language/theme/scale changed, so windows need rebuilding
+    readonly TableLayoutPanel body;
 
-        static void Row(TableLayoutPanel g, string label, Control c)
+    public SettingsForm(Settings settings, Action<bool> changed, Action? testAlert = null, Func<IWin32Window, Task>? checkUpdates = null)
+    {
+        s = settings;
+        this.changed = changed;
+        Theme.Apply(this, '');
+        Text = L.T("Settings");
+        ClientSize = new Size(Theme.Dp(900), Theme.Dp(760));
+
+        body = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Dock = DockStyle.Top, Padding = new Padding(Theme.Dp(8), 0, Theme.Dp(8), Theme.Dp(24)) };
+        body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Bg };
+        scroll.Controls.Add(body);
+        scroll.HandleCreated += (_, _) => Theme.DarkScrollbars(scroll);
+        Controls.Add(scroll);
+        // Content keeps a comfortable reading width, centred when the window is wide.
+        scroll.Resize += (_, _) =>
         {
-            c.Anchor = AnchorStyles.Left;
-            g.Controls.Add(Theme.Label(label));
-            g.Controls.Add(c);
-        }
+            var side = Math.Max(Theme.Dp(8), (scroll.ClientSize.Width - Theme.Dp(1000)) / 2);
+            body.Padding = new Padding(side, 0, side, Theme.Dp(24));
+        };
 
         // General
-        var general = Theme.Section(L.T("General"), out var g1);
+        Header(L.T("General"));
         var lang = new Segmented(L.Languages.Select(l => l.Name), Array.FindIndex(L.Languages, l => l.Code == s.Lang));
-        Row(g1, L.T("Language"), lang);
-        var city = s.City;
-        var cityBtn = Theme.Button(city.Title + "  ›");
+        lang.Changed += i => Set(() => s.Lang = L.Languages[i].Code, rebuild: true);
+        Card('', L.T("Language"), null, lang);
+        var cityBtn = Theme.Button(s.City.Title + "  ›");
         cityBtn.Click += (_, _) =>
         {
             using var f = new CityPicker();
-            if (f.ShowDialog(this) == DialogResult.OK && f.Selected != null)
-            {
-                city = f.Selected;
-                cityBtn.Text = city.Title + "  ›";
-            }
+            if (f.ShowDialog(this) != DialogResult.OK || f.Selected == null) return;
+            cityBtn.Text = f.Selected.Title + "  ›";
+            Set(() => s.City = f.Selected);
         };
-        Row(g1, L.T("City"), cityBtn);
+        Card('', L.T("City"), null, cityBtn);
         var madhab = new Segmented([L.T("Hanafi"), L.T("OtherMadhabs")], s.Hanafi ? 0 : 1);
-        Row(g1, L.T("AsrMethod"), madhab);
+        madhab.Changed += i => Set(() => s.Hanafi = i == 0);
+        Card('', L.T("AsrMethod"), null, madhab);
         var timeFormat = new Segmented([L.T("H24"), L.T("H12")], s.Hour12 ? 1 : 0);
-        Row(g1, L.T("TimeFormat"), timeFormat);
+        timeFormat.Changed += i => Set(() => s.Hour12 = i == 1);
+        Card('', L.T("TimeFormat"), null, timeFormat);
         var fasting = new Segmented([L.T("FastAuto"), L.T("FastAlways"), L.T("FastOff")], (int)s.Fasting);
-        Row(g1, L.T("FastTimes"), fasting);
+        fasting.Changed += i => Set(() => s.Fasting = (FastingMode)i);
+        Card('', L.T("FastTimes"), null, fasting);
         var hijri = new Stepper(s.HijriAdjust, -2, 2, 1, v => v > 0 ? $"+{v}" : v.ToString());
-        Row(g1, L.T("HijriAdjust"), hijri);
-        var uiScale = new Stepper(s.UiScale, 80, 160, 10, v => v + "%");
-        Row(g1, L.T("WindowScale"), uiScale);
+        hijri.ValueChanged += v => Set(() => s.HijriAdjust = v);
+        Card('', L.T("HijriAdjust"), null, hijri);
+
+        // Appearance
+        Header(L.T("Appearance"));
         var themeMode = new Segmented([L.T("ThemeSystem"), L.T("ThemeDark"), L.T("ThemeLight")], s.ThemeMode);
-        Row(g1, L.T("ThemeMode"), themeMode);
+        themeMode.Changed += i => Set(() => s.ThemeMode = i, rebuild: true);
+        Card('', L.T("ThemeMode"), null, themeMode);
+        var uiScale = new Stepper(s.UiScale, 80, 160, 10, v => v + "%");
+        uiScale.ValueChanged += v => Set(() => s.UiScale = v, rebuild: true);
+        Card('', L.T("WindowScale"), null, uiScale);
 
         // Notifications
-        var notif = Theme.Section(L.T("Notifications"), out var g2);
-        var notifyOn = new Toggle(!s.Muted);
-        Row(g2, L.T("NotifyOn"), notifyOn);
+        Header(L.T("Notifications"));
+        Card('', L.T("NotifyOn"), null, Switch(!s.Muted, v => s.Muted = !v));
         string MinOrOff(int v) => v == 0 ? L.T("Off") : string.Format(L.T("Min"), v);
         var remind = new Stepper(s.RemindBefore, 0, 60, 5, MinOrOff);
-        Row(g2, L.T("RemindBefore"), remind);
-        var jumuah = new Toggle(s.Jumuah);
+        remind.ValueChanged += v => Set(() => s.RemindBefore = v);
+        Card('', L.T("RemindBefore"), null, remind);
         var jumuahMin = new Stepper(s.JumuahBefore, 15, 180, 15, MinOrOff);
+        jumuahMin.ValueChanged += v => Set(() => s.JumuahBefore = v);
         var jumuahRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
-        jumuahRow.Controls.AddRange([jumuah, jumuahMin]);
-        Row(g2, L.T("JumuahRemind"), jumuahRow);
+        jumuahRow.Controls.AddRange([jumuahMin, Switch(s.Jumuah, v => s.Jumuah = v)]);
+        Card('', L.T("JumuahRemind"), null, jumuahRow);
         var test = Theme.Button(L.T("TestAlert"));
         test.Click += (_, _) => testAlert?.Invoke();
-        g2.Controls.Add(test); g2.SetColumnSpan(test, 2);
+        Card('', L.T("TestAlert"), null, test);
+
+        // Prayer times: show / notify / offset for each
+        Header(L.T("Prayers"));
+        foreach (var p in Enum.GetValues<P>())
+        {
+            var row = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+            var off = new Stepper(s.Offsets.GetValueOrDefault(p), -30, 30, 1, v => v > 0 ? $"+{v}" : v.ToString());
+            off.ValueChanged += v => Set(() => { if (v == 0) s.Offsets.Remove(p); else s.Offsets[p] = v; });
+            row.Controls.AddRange([
+                Labelled(L.T("Show"), Switch(!s.Hidden.Contains(p), v => { if (v) s.Hidden.Remove(p); else s.Hidden.Add(p); })),
+                Labelled(L.T("Notify"), Switch(s.Alerts.Contains(p), v => { if (v) s.Alerts.Add(p); else s.Alerts.Remove(p); })),
+                Labelled(L.T("Offset"), off),
+            ]);
+            Card('', L.Name(p), null, row);
+        }
+
+        // Reminders
+        Header(L.T("Reminders"));
+        Card('', L.T("RemFasts"), null, Switch(s.RemindSunnahFasts, v => s.RemindSunnahFasts = v));
+        Card('', L.T("RemHolidays"), null, Switch(s.RemindHolidays, v => s.RemindHolidays = v));
+        Card('', L.T("RemKahf"), null, Switch(s.RemindKahf, v => s.RemindKahf = v));
+        Card('', L.T("RemAdhkar"), null, Switch(s.RemindAdhkar, v => s.RemindAdhkar = v));
+        Card('', L.T("RemFullscreen"), null, Switch(s.FullscreenAlert, v => s.FullscreenAlert = v));
 
         // Widget
-        var widget = Theme.Section(L.T("Widget"), out var g3);
+        Header(L.T("Widget"));
         var zoom = new Stepper(s.Zoom, 70, 250, 10, v => v + "%");
-        Row(g3, L.T("Size"), zoom);
+        zoom.ValueChanged += v => Set(() => s.Zoom = v);
+        Card('', L.T("Size"), L.T("ResizeHint"), zoom);
         var opacity = new Stepper(s.Opacity, 30, 100, 10, v => v + "%");
-        Row(g3, L.T("Opacity"), opacity);
-        var nameOfDay = new Toggle(s.ShowNameOfDay);
-        Row(g3, L.T("ShowNameOfDay"), nameOfDay);
-        var topMost = new Toggle(s.TopMost);
-        Row(g3, L.T("TopMost"), topMost);
+        opacity.ValueChanged += v => Set(() => s.Opacity = v);
+        Card('', L.T("Opacity"), null, opacity);
+        Card('', L.T("ShowNameOfDay"), null, Switch(s.ShowNameOfDay, v => s.ShowNameOfDay = v));
+        Card('', L.T("TopMost"), null, Switch(s.TopMost, v => s.TopMost = v));
         var autoStart = new Toggle(Widget.AutoStart);
-        Row(g3, L.T("AutoStart"), autoStart);
-        var hint = Theme.Label(L.T("ResizeHint"), Theme.Muted, 8.5f);
-        g3.Controls.Add(hint); g3.SetColumnSpan(hint, 2);
+        autoStart.CheckedChanged += (_, _) => Widget.AutoStart = autoStart.Checked;
+        Card('', L.T("AutoStart"), null, autoStart);
 
-        // Prayers: name | show | notify | offset
-        var prayers = Theme.Section(L.T("Prayers"), out var g4, 4);
-        foreach (var h in new[] { "", L.T("Show"), L.T("Notify"), L.T("Offset") })
-        {
-            var l = Theme.Label(h, Theme.Muted, 8.5f);
-            l.Anchor = h == "" ? AnchorStyles.Left : AnchorStyles.None;
-            g4.Controls.Add(l);
-        }
-        var rows = Enum.GetValues<P>().Select(p =>
-        {
-            var show = new Toggle(!s.Hidden.Contains(p));
-            var notify = new Toggle(s.Alerts.Contains(p));
-            var off = new Stepper(s.Offsets.GetValueOrDefault(p), -30, 30, 1, v => v > 0 ? $"+{v}" : v.ToString());
-            g4.Controls.Add(Theme.Label(L.Name(p)));
-            g4.Controls.AddRange([show, notify, off]);
-            return (p, show, notify, off);
-        }).ToList();
-
-        // Layout: two columns of cards + footer
-        var left = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Margin = new Padding(0, 0, Theme.Dp(12), 0) };
-        left.Controls.AddRange([general, notif, widget]);
-        // Reminders besides prayer times
-        var reminders = Theme.Section(L.T("Reminders"), out var g5);
-        var remFasts = new Toggle(s.RemindSunnahFasts);
-        Row(g5, L.T("RemFasts"), remFasts);
-        var remHolidays = new Toggle(s.RemindHolidays);
-        Row(g5, L.T("RemHolidays"), remHolidays);
-        var remKahf = new Toggle(s.RemindKahf);
-        Row(g5, L.T("RemKahf"), remKahf);
-        var remAdhkar = new Toggle(s.RemindAdhkar);
-        Row(g5, L.T("RemAdhkar"), remAdhkar);
-        var fullscreen = new Toggle(s.FullscreenAlert);
-        Row(g5, L.T("RemFullscreen"), fullscreen);
-
-        var right = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
-        right.Controls.AddRange([prayers, reminders]);
-
-        var save = Theme.Button(L.T("Save"), primary: true);
-        var cancel = Theme.Button(L.T("Cancel"));
-        save.DialogResult = DialogResult.OK; cancel.DialogResult = DialogResult.Cancel;
-        AcceptButton = save; CancelButton = cancel;
-        var buttons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Right, Margin = Padding.Empty };
-        buttons.Controls.AddRange([cancel, save]);
-        var version = Theme.Label($"v{Updates.Current.ToString(3)} · muftyat.kz", Theme.Muted, 8.5f);
+        // About this app: version, updates, backup
+        Header(L.T("About"));
         var check = Theme.Button("↻ " + L.T("CheckUpdates"));
         check.Click += async (_, _) => { check.Enabled = false; try { await (checkUpdates?.Invoke(this) ?? Task.CompletedTask); } finally { check.Enabled = true; } };
-        var about = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.Left, Margin = Padding.Empty };
-        // Backup: export the settings file / import it back (e.g. on a new computer)
+        Card('', $"Namaz Times KZ {Updates.Current.ToString(3)}", "muftyat.kz", check);
         var export = Theme.Button("⭳ " + L.T("Export"));
         var import = Theme.Button("⭱ " + L.T("Import"));
         export.Click += (_, _) =>
@@ -141,17 +137,14 @@ public class SettingsForm : Form
             using var d = new OpenFileDialog { Filter = "JSON|*.json" };
             if (d.ShowDialog(this) != DialogResult.OK) return;
             if (!Data.Import(d.FileName, s)) { MessageBox.Show(this, L.T("ImportFailed"), Text); return; }
-            DialogResult = DialogResult.OK; // closing as "saved" makes the widget apply the imported settings
-            Close();
+            Changed(rebuild: true); // the page is rebuilt from the imported values
         };
-        about.Controls.AddRange([version, check, export, import]);
+        var backup = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        backup.Controls.AddRange([export, import]);
+        Card('', L.T("Backup"), null, backup);
 
-        var root = new TableLayoutPanel { AutoSize = true, ColumnCount = 2, Padding = new Padding(Theme.Dp(16)) };
-        root.Controls.Add(left); root.Controls.Add(right);
-        root.Controls.Add(about); root.Controls.Add(buttons);
-
-        // Credit line, centred under everything.
-        var credit = new Control { Size = new Size(Theme.Dp(360), Theme.Dp(24)), Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(10), 0, 0) };
+        // Credit line
+        var credit = new Control { Size = new Size(Theme.Dp(360), Theme.Dp(28)), Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(16), 0, 0) };
         credit.Paint += (_, e) =>
         {
             const string text = "Made by Nurbol Khamzauly with ";
@@ -164,41 +157,75 @@ public class SettingsForm : Form
             TextRenderer.DrawText(e.Graphics, text, font, new Rectangle(x, 0, tw, credit.Height), Theme.Muted, flags);
             TextRenderer.DrawText(e.Graphics, "❤", heartFont, new Rectangle(x + tw, 0, hw, credit.Height), Color.FromArgb(229, 57, 70), flags);
         };
-        root.Controls.Add(credit); root.SetColumnSpan(credit, 2);
-        Controls.Add(root);
+        body.Controls.Add(credit);
+    }
 
-        // Shown modeless, so DialogResult alone doesn't close the window.
-        cancel.Click += (_, _) => Close();
+    /// Apply a change: update the setting, save, and let the widget pick it up.
+    void Set(Action apply, bool rebuild = false)
+    {
+        apply();
+        Changed(rebuild);
+    }
 
-        save.Click += (_, _) =>
+    // Rebuilding disposes this page, so never do it inside the control's own event.
+    void Changed(bool rebuild) => BeginInvoke(() => changed(rebuild));
+
+    Toggle Switch(bool value, Action<bool> apply)
+    {
+        var t = new Toggle(value) { Anchor = AnchorStyles.Right };
+        t.CheckedChanged += (_, _) => Set(() => apply(t.Checked));
+        return t;
+    }
+
+    /// A small caption to the left of a control (used in the prayer rows).
+    static FlowLayoutPanel Labelled(string text, Control c)
+    {
+        var l = Theme.Label(text, Theme.Muted, 9f);
+        l.Margin = new Padding(Theme.Dp(14), Theme.Dp(8), Theme.Dp(6), 0);
+        c.Margin = new Padding(0, Theme.Dp(3), 0, Theme.Dp(3));
+        var p = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        p.Controls.AddRange([l, c]);
+        return p;
+    }
+
+    void Header(string text)
+    {
+        var l = Theme.Label(text, Theme.Text, 10.5f, FontStyle.Bold);
+        l.Margin = new Padding(Theme.Dp(2), Theme.Dp(body.Controls.Count == 0 ? 4 : 22), 0, Theme.Dp(8));
+        body.Controls.Add(l);
+    }
+
+    /// One Windows-Settings card: glyph, title (and hint) on the left, the control on the right.
+    void Card(char glyph, string title, string? hint, Control control)
+    {
+        var card = new TableLayoutPanel
         {
-            s.Lang = L.Languages[lang.Selected].Code;
-            s.City = city;
-            s.Hanafi = madhab.Selected == 0;
-            s.Hour12 = timeFormat.Selected == 1;
-            s.Fasting = (FastingMode)fasting.Selected;
-            s.HijriAdjust = hijri.Value;
-            s.UiScale = uiScale.Value;
-            s.ThemeMode = themeMode.Selected;
-            s.Muted = !notifyOn.Checked;
-            s.RemindBefore = remind.Value;
-            s.Jumuah = jumuah.Checked;
-            s.JumuahBefore = jumuahMin.Value;
-            s.Zoom = zoom.Value;
-            s.Opacity = opacity.Value;
-            s.TopMost = topMost.Checked;
-            s.ShowNameOfDay = nameOfDay.Checked;
-            s.RemindSunnahFasts = remFasts.Checked;
-            s.RemindHolidays = remHolidays.Checked;
-            s.RemindKahf = remKahf.Checked;
-            s.RemindAdhkar = remAdhkar.Checked;
-            s.FullscreenAlert = fullscreen.Checked;
-            s.Hidden = rows.Where(r => !r.show.Checked).Select(r => r.p).ToHashSet();
-            s.Alerts = rows.Where(r => r.notify.Checked).Select(r => r.p).ToHashSet();
-            s.Offsets = rows.Where(r => r.off.Value != 0).ToDictionary(r => r.p, r => r.off.Value);
-            if (autoStart.Checked != Widget.AutoStart) Widget.AutoStart = autoStart.Checked;
-            Close();
+            ColumnCount = 3, AutoSize = true, Dock = DockStyle.Top, BackColor = Theme.Card, Margin = new Padding(0, 0, 0, Theme.Dp(4)),
+            Padding = new Padding(Theme.Dp(16), Theme.Dp(10), Theme.Dp(16), Theme.Dp(10)), MinimumSize = new Size(0, Theme.Dp(66)),
         };
+        card.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        card.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        card.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        var icon = new Label
+        {
+            Text = glyph.ToString(), Font = new Font("Segoe MDL2 Assets", 13f * Theme.UiScale), ForeColor = Theme.Text, AutoSize = true,
+            Anchor = AnchorStyles.Left, Margin = new Padding(0, 0, Theme.Dp(16), 0),
+        };
+        var texts = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Anchor = AnchorStyles.Left, Margin = Padding.Empty };
+        var t = Theme.Label(title, Theme.Text, 10.5f);
+        t.Margin = Padding.Empty;
+        texts.Controls.Add(t);
+        if (hint != null)
+        {
+            var h = Theme.Label(hint, Theme.Muted, 8.5f);
+            h.Margin = new Padding(0, Theme.Dp(2), 0, 0);
+            texts.Controls.Add(h);
+        }
+        control.Anchor = AnchorStyles.Right;
+        card.Controls.Add(icon, 0, 0);
+        card.Controls.Add(texts, 1, 0);
+        card.Controls.Add(control, 2, 0);
+        body.Controls.Add(Theme.Round(card));
     }
 }
 
