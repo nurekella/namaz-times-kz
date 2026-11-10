@@ -51,9 +51,9 @@ public class QadaForm : Form
 
         // Add a whole period to every prayer at once
         var bulk = Theme.Section(L.T("QadaAddPeriod"), out var b, 3);
-        var amount = new NumericUpDown
+        var amount = new NumberBox
         {
-            Minimum = 1, Maximum = 36500, Value = 1, Width = Theme.Dp(90), Font = Theme.UI(11f),
+            Minimum = 1, Maximum = 36500, Value = 1, Width = Theme.Dp(130), Font = Theme.UI(11f),
             BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.None, Anchor = AnchorStyles.Left,
             Margin = new Padding(0, Theme.Dp(4), Theme.Dp(10), Theme.Dp(4)),
         };

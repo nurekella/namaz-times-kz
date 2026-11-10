@@ -88,9 +88,9 @@ public class TasbihForm : Form
         var targetRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(4), 0, Theme.Dp(6)) };
         target.Margin = new Padding(0, 0, Theme.Dp(8), 0);
         // Own number: shown only while "Custom" is selected
-        var custom = new NumericUpDown
+        var custom = new NumberBox
         {
-            Minimum = 10, Maximum = 100_000, Value = Math.Clamp(CustomCount, 10, 100_000), Width = Theme.Dp(84), Font = Theme.UI(11f),
+            Minimum = 10, Maximum = 100_000, Value = Math.Clamp(CustomCount, 10, 100_000), Width = Theme.Dp(130), Font = Theme.UI(11f),
             BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.None, TextAlign = HorizontalAlignment.Center,
             Margin = new Padding(0, Theme.Dp(3), Theme.Dp(8), 0), Visible = TargetOption == Custom,
         };

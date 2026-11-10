@@ -34,9 +34,9 @@ public class ZakatForm : Form
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
-        NumericUpDown Money(decimal value, Action<decimal> set, int decimals = 0)
+        NumberBox Money(decimal value, Action<decimal> set, int decimals = 0)
         {
-            var n = new NumericUpDown
+            var n = new NumberBox
             {
                 Maximum = 100_000_000_000m, DecimalPlaces = decimals, ThousandsSeparator = true, Value = Math.Clamp(value, 0, 100_000_000_000m),
                 Width = Theme.Dp(170), Font = Theme.UI(10.5f), BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.None,
