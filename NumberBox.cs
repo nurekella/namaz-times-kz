@@ -37,8 +37,12 @@ public class NumberBox : Panel
         Display();
     }
 
-    int SpinW => Theme.Dp(56);
-    Rectangle SpinRect(int i) => new(Width - SpinW - Theme.Dp(4) + i * Theme.Dp(28), Theme.Dp(4), Theme.Dp(26), Height - Theme.Dp(8));
+    int SpinW => Theme.Dp(60);
+    Rectangle SpinRect(int i) => SpinRect(Size, i);
+
+    /// The ▲ (0) and ▼ (1) buttons inside a field of the given size; shared with Stepper.
+    public static Rectangle SpinRect(Size size, int i) =>
+        new(size.Width - Theme.Dp(60) + i * Theme.Dp(28), Theme.Dp(4), Theme.Dp(26), size.Height - Theme.Dp(8));
 
     public decimal Minimum { get => min; set { min = value; Value = this.value; } }
     public decimal Maximum { get => max; set { max = value; Value = this.value; } }
@@ -99,23 +103,24 @@ public class NumberBox : Panel
         else box.Focus();
     }
 
-    protected override void OnPaintBackground(PaintEventArgs e)
+    protected override void OnPaintBackground(PaintEventArgs e) => PaintField(e.Graphics, this, box.Focused, hotSpin);
+
+    /// Fluent field: fill, hairline border, underline (accent while focused), and the two spin buttons.
+    public static void PaintField(Graphics g, Control c, bool focused, int hotSpin)
     {
-        var g = e.Graphics;
-        g.Clear(Parent?.BackColor ?? Theme.Bg);
+        g.Clear(c.Parent?.BackColor ?? Theme.Bg);
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        int rad = Theme.Dp(Theme.ControlRadius);
-        using var path = Theme.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), rad);
+        int rad = Theme.Dp(Theme.ControlRadius), w = c.Width, h = c.Height;
+        using var path = Theme.RoundRect(new RectangleF(0.5f, 0.5f, w - 1.5f, h - 1.5f), rad);
         using (var b = new SolidBrush(Theme.CtlFill)) g.FillPath(b, path);
         using (var p = new Pen(Theme.CtlStroke)) g.DrawPath(p, path);
-        var focused = box.Focused;
         using (var u = new Pen(focused ? Theme.Accent : Theme.Muted, focused ? Theme.Dp(2) : 1))
-            g.DrawLine(u, rad, Height - (focused ? Theme.Dp(1) : 1), Width - rad, Height - (focused ? Theme.Dp(1) : 1));
+            g.DrawLine(u, rad, h - (focused ? Theme.Dp(1) : 1), w - rad, h - (focused ? Theme.Dp(1) : 1));
         using var icons = new Font(Theme.IconFamily, 7.5f * Theme.UiScale);
-        string[] glyphs = ["", ""]; // ChevronUp, ChevronDown
+        string[] glyphs = ["\uE70E", "\uE70D"]; // ChevronUp, ChevronDown
         for (int i = 0; i < 2; i++)
         {
-            var r = SpinRect(i);
+            var r = SpinRect(c.Size, i);
             if (i == hotSpin)
                 using (var hp = Theme.RoundRect(r, rad))
                 using (var hb = new SolidBrush(Theme.Line)) g.FillPath(hb, hp);

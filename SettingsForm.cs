@@ -249,9 +249,19 @@ public class CityPicker : Form
         var list = new ListBox
         {
             Dock = DockStyle.Fill, IntegralHeight = false, BackColor = Theme.Card, ForeColor = Theme.Text,
-            BorderStyle = BorderStyle.None, Font = Theme.UI(10f),
+            BorderStyle = BorderStyle.None, Font = Theme.UI(10f), DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = Theme.Dp(36),
+        };
+        list.DrawItem += (_, e) =>
+        {
+            if (e.Index < 0) return;
+            var selected = (e.State & DrawItemState.Selected) != 0;
+            Theme.ListItem(e.Graphics, e.Bounds, selected);
+            TextRenderer.DrawText(e.Graphics, list.Items[e.Index].ToString(), list.Font,
+                new Rectangle(e.Bounds.X + Theme.Dp(16), e.Bounds.Y, e.Bounds.Width - Theme.Dp(22), e.Bounds.Height),
+                Theme.Text, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         };
         list.HandleCreated += (_, _) => Theme.DarkScrollbars(list);
+        Theme.Round(list);
         var choose = Theme.Button(L.T("Choose"), primary: true);
         var cancel = Theme.Button(L.T("Cancel"));
         cancel.DialogResult = DialogResult.Cancel; CancelButton = cancel; AcceptButton = choose;

@@ -11,12 +11,12 @@ static class Grid
             SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ScrollBars = ScrollBars.Vertical,
             AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells, // row height follows the font, so descenders aren't clipped
-            BackgroundColor = Theme.Bg, GridColor = Theme.Line, EnableHeadersVisualStyles = false,
+            BackgroundColor = Theme.Card, GridColor = Theme.CardStroke, EnableHeadersVisualStyles = false,
             CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
             ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
         };
-        g.DefaultCellStyle.BackColor = Theme.Bg;
+        g.DefaultCellStyle.BackColor = Theme.Card;
         g.DefaultCellStyle.ForeColor = Theme.Text;
         g.DefaultCellStyle.SelectionBackColor = Theme.Line;
         g.DefaultCellStyle.SelectionForeColor = Theme.Text;
@@ -24,6 +24,11 @@ static class Grid
         g.ColumnHeadersDefaultCellStyle.BackColor = Theme.Card;
         g.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Muted;
         g.ColumnHeadersDefaultCellStyle.SelectionBackColor = Theme.Card;
+        g.ColumnHeadersDefaultCellStyle.Font = Theme.UI(9.5f, FontStyle.Bold);
+        // hover: soft fill on the row under the mouse, like a Fluent list
+        g.CellMouseEnter += (_, e) => { if (e.RowIndex >= 0) g.Rows[e.RowIndex].DefaultCellStyle.BackColor = Theme.Line; };
+        g.CellMouseLeave += (_, e) => { if (e.RowIndex >= 0) g.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.Empty; };
+        Theme.Round(g);
         g.ColumnHeadersDefaultCellStyle.Padding = g.DefaultCellStyle.Padding;
         g.HandleCreated += (_, _) => Theme.DarkScrollbars(g);
         return g;
@@ -74,7 +79,7 @@ public class MonthForm : Form
                 cells.AddRange(cols.Select(p => (object)(times?.Where(t => t.P == p).Select(t => L.Time(t.At)).FirstOrDefault() ?? "—")));
                 var r = grid.Rows[grid.Rows.Add(cells.ToArray())];
                 if (d == now) Grid.Highlight(r, Theme.Accent);
-                else if (d.DayOfWeek == DayOfWeek.Friday) r.DefaultCellStyle.BackColor = Theme.Card;
+                else if (d.DayOfWeek == DayOfWeek.Friday) r.DefaultCellStyle.ForeColor = Theme.Accent; // Friday in accent, not a different fill
             }
             grid.ClearSelection();
         }

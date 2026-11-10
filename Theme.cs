@@ -10,6 +10,7 @@ public static class Theme
     public static Color Bg, Card, Line, Text, Muted, Accent, OnAccent, Gold, Faded, Marked;
     // WinUI control fills and the elevation border of buttons
     public static Color CtlFill, CtlHover, CtlPressed, CtlStroke, CtlStrokeBottom;
+    public static Color CardStroke, Flyout; // card border, menu background
     public static bool IsDark = true;
     public static readonly Color NightBg = Color.FromArgb(24, 28, 34), NightLine = Color.FromArgb(48, 54, 64), NightAccent = Color.FromArgb(94, 196, 140);
 
@@ -27,6 +28,7 @@ public static class Theme
             (Gold, Faded, Marked) = (Color.FromArgb(230, 190, 110), Color.FromArgb(110, 110, 110), Color.FromArgb(47, 56, 50));
             (CtlFill, CtlHover, CtlPressed) = (Color.FromArgb(45, 45, 45), Color.FromArgb(50, 50, 50), Color.FromArgb(39, 39, 39));
             (CtlStroke, CtlStrokeBottom) = (Color.FromArgb(55, 55, 55), Color.FromArgb(48, 48, 48));
+            (CardStroke, Flyout) = (Color.FromArgb(29, 29, 29), Color.FromArgb(44, 44, 44));
         }
         else
         {
@@ -35,6 +37,7 @@ public static class Theme
             (Gold, Faded, Marked) = (Color.FromArgb(154, 103, 0), Color.FromArgb(168, 168, 168), Color.FromArgb(232, 243, 236));
             (CtlFill, CtlHover, CtlPressed) = (Color.FromArgb(251, 251, 251), Color.FromArgb(246, 246, 246), Color.FromArgb(245, 245, 245));
             (CtlStroke, CtlStrokeBottom) = (Color.FromArgb(229, 229, 229), Color.FromArgb(204, 204, 204));
+            (CardStroke, Flyout) = (Color.FromArgb(229, 229, 229), Color.FromArgb(249, 249, 249));
         }
     }
 
@@ -115,11 +118,32 @@ public static class Theme
         return Icon.FromHandle(bmp.GetHicon());
     }
 
-    /// Rounds a panel's corners (clipping region, kept in step with its size).
     public const int CardRadius = 8, ControlRadius = 4; // Fluent 2
 
+    /// Fluent card corners. Panels get smooth (anti-aliased) corners and a hairline border painted over
+    /// their background; controls that paint themselves (lists, grids) are clipped to a rounded region.
     public static T Round<T>(T c, int radius = CardRadius) where T : Control
     {
+        if (c is Panel)
+        {
+            c.Paint += (_, e) =>
+            {
+                var g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                var r = new RectangleF(0.5f, 0.5f, c.Width - 1.5f, c.Height - 1.5f);
+                using var path = RoundRect(r, Dp(radius));
+                using (var outside = new Region(new Rectangle(0, 0, c.Width, c.Height)))
+                {
+                    outside.Exclude(path);
+                    using var bg = new SolidBrush(c.Parent?.BackColor ?? Bg);
+                    g.FillRegion(bg, outside);
+                }
+                using var stroke = new Pen(c.BackColor == Card ? CardStroke : CtlStroke);
+                g.DrawPath(stroke, path);
+            };
+            c.SizeChanged += (_, _) => c.Invalidate();
+            return c;
+        }
         void Clip()
         {
             if (c.Width <= 0 || c.Height <= 0) return;
@@ -207,7 +231,7 @@ public static class Theme
         var m = new ContextMenuStrip
         {
             Renderer = new MenuRenderer(), Font = UI(10f), ShowCheckMargin = false, ShowImageMargin = true,
-            Padding = new Padding(Dp(4)), ImageScalingSize = new Size(Dp(18), Dp(18)),
+            Padding = new Padding(Dp(4)), ImageScalingSize = new Size(Dp(16), Dp(16)), DropShadowEnabled = true,
         };
         m.HandleCreated += (_, _) =>
         {
@@ -219,7 +243,7 @@ public static class Theme
 
     public static ToolStripMenuItem MenuItem(char glyph, EventHandler onClick) => new("", Glyph(glyph, Text), onClick)
     {
-        Tag = glyph, Padding = new Padding(0, Dp(5), Dp(8), Dp(5)),
+        Tag = glyph, Padding = new Padding(0, Dp(7), Dp(16), Dp(7)),
     };
 
     public static Bitmap Glyph(char glyph, Color color)
@@ -238,11 +262,12 @@ public static class Theme
     class MenuRenderer : ToolStripProfessionalRenderer
     {
 
-        protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e) => e.Graphics.Clear(Card);
+        // Windows 11 flyout: its own surface colour and a hairline border (DWM rounds the corners)
+        protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e) => e.Graphics.Clear(Flyout);
 
         protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
         {
-            using var pen = new Pen(Line);
+            using var pen = new Pen(CtlStroke);
             e.Graphics.DrawRectangle(pen, 0, 0, e.ToolStrip.Width - 1, e.ToolStrip.Height - 1);
         }
 
@@ -254,32 +279,34 @@ public static class Theme
             if (e.Item.Selected && e.Item.Enabled)
             {
                 using var path = RoundRect(new RectangleF(Dp(2), 1, e.Item.Width - Dp(4), e.Item.Height - 2), Dp(ControlRadius));
-                using var b = new SolidBrush(Line);
+                using var b = new SolidBrush(IsDark ? Color.FromArgb(56, 56, 56) : Color.FromArgb(237, 237, 237));
                 e.Graphics.FillPath(b, path);
             }
+            // checked item ("show widget", "mute"): a short accent pill on the left, like a selected nav item
+            if (e.Item is ToolStripMenuItem { Checked: true })
+            {
+                int h = Dp(16);
+                using var pill = RoundRect(new RectangleF(Dp(3), (e.Item.Height - h) / 2f, Dp(3), h), Dp(1));
+                using var a = new SolidBrush(Accent);
+                e.Graphics.FillPath(a, pill);
+            }
         }
 
-        // Checked items ("show widget", "mute") get a green icon on a soft green chip instead of the default blue box.
+        // Icons are drawn from the glyph each time, so they follow theme changes; checked ones are accent-coloured.
         protected override void OnRenderItemImage(ToolStripItemImageRenderEventArgs e)
         {
-            if (e.Image == null) return;
-            if (e.Item is ToolStripMenuItem { Checked: true, Tag: char glyph })
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                var r = RectangleF.Inflate(e.ImageRectangle, Dp(4), Dp(4));
-                using var chip = RoundRect(r, Dp(5));
-                using var b = new SolidBrush(Color.FromArgb(55, Accent));
-                e.Graphics.FillPath(b, chip);
-                e.Graphics.DrawImage(Checked.TryGetValue(glyph, out var img) ? img : Checked[glyph] = Glyph(glyph, Accent), e.ImageRectangle);
-            }
-            else e.Graphics.DrawImage(e.Image, e.ImageRectangle);
+            if (e.Item.Tag is not char glyph) { if (e.Image != null) e.Graphics.DrawImage(e.Image, e.ImageRectangle); return; }
+            var color = e.Item is ToolStripMenuItem { Checked: true } ? Accent : e.Item.Enabled ? Text : Faded;
+            var key = (glyph, color.ToArgb());
+            if (!Icons.TryGetValue(key, out var img)) Icons[key] = img = Glyph(glyph, color);
+            e.Graphics.DrawImage(img, e.ImageRectangle);
         }
 
-        static readonly Dictionary<char, Bitmap> Checked = [];
+        static readonly Dictionary<(char, int), Bitmap> Icons = [];
 
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
-            e.TextColor = e.Item.Enabled ? Text : Muted;
+            e.TextColor = e.Item.Enabled ? Text : Faded;
             base.OnRenderItemText(e);
         }
 
@@ -290,9 +317,9 @@ public static class Theme
 
         protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
         {
-            using var pen = new Pen(Line);
+            using var pen = new Pen(CtlStroke);
             var y = e.Item.Height / 2;
-            e.Graphics.DrawLine(pen, Dp(10), y, e.Item.Width - Dp(10), y);
+            e.Graphics.DrawLine(pen, 0, y, e.Item.Width, y); // Fluent separators run edge to edge
         }
     }
 
@@ -472,11 +499,11 @@ public class Toggle : Control
     }
 }
 
-/// "− value +" numeric picker.
-public class Stepper : FlowLayoutPanel
+/// Counter in the Windows 11 NumberBox look: the value in a Fluent field with inline ▲▼ spin buttons.
+/// Arrow keys and the mouse wheel step it as well. Format shows units ("60 мин", "100%", "+2").
+public class Stepper : Control
 {
-    readonly Label text;
-    int value;
+    int value, hotSpin = -1;
     public int Min, Max, Step;
     public Func<int, string> Format = v => v.ToString();
     public event Action<int>? ValueChanged;
@@ -485,23 +512,13 @@ public class Stepper : FlowLayoutPanel
     {
         (Min, Max, Step) = (min, max, step);
         if (format != null) Format = format;
-        AutoSize = true; WrapContents = false; Margin = new Padding(0, Theme.Dp(2), 0, Theme.Dp(2));
+        SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.Selectable, true);
+        TabStop = true;
+        Font = Theme.UI(10f);
+        Size = new Size(Theme.Dp(150), Theme.Dp(32));
+        Margin = new Padding(0, Theme.Dp(2), 0, Theme.Dp(2));
         Anchor = AnchorStyles.Left;
-        text = new Label
-        {
-            AutoSize = false, Width = Theme.Dp(64), Height = Theme.Dp(32), TextAlign = ContentAlignment.MiddleCenter,
-            ForeColor = Theme.Text, Font = Theme.UI(10f), Margin = Padding.Empty,
-        };
-        Controls.AddRange([Btn('\uE738', -1), text, Btn('\uE710', 1)]); // Remove, Add
-        Value = value;
-    }
-
-    Button Btn(char glyph, int dir)
-    {
-        var b = Theme.Button("", glyph: glyph);
-        b.AutoSize = false; b.Size = new Size(Theme.Dp(32), Theme.Dp(32)); b.Margin = Padding.Empty;
-        b.Click += (_, _) => Value += dir * Step;
-        return b;
+        this.value = Math.Clamp(value, min, max);
     }
 
     public int Value
@@ -510,11 +527,53 @@ public class Stepper : FlowLayoutPanel
         set
         {
             var v = Math.Clamp(value, Min, Max);
-            var changed = v != this.value;
+            if (v == this.value) return;
             this.value = v;
-            text.Text = Format(v);
-            if (changed) ValueChanged?.Invoke(v);
+            Invalidate();
+            ValueChanged?.Invoke(v);
         }
+    }
+
+    Rectangle Spin(int i) => NumberBox.SpinRect(Size, i);
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        var h = Spin(0).Contains(e.Location) ? 0 : Spin(1).Contains(e.Location) ? 1 : -1;
+        Cursor = h >= 0 ? Cursors.Hand : Cursors.Default;
+        if (h != hotSpin) { hotSpin = h; Invalidate(); }
+    }
+
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hotSpin = -1; Invalidate(); }
+
+    protected override void OnMouseDown(MouseEventArgs e)
+    {
+        base.OnMouseDown(e);
+        Focus();
+        if (Spin(0).Contains(e.Location)) Value += Step;
+        else if (Spin(1).Contains(e.Location)) Value -= Step;
+    }
+
+    protected override void OnMouseWheel(MouseEventArgs e) { base.OnMouseWheel(e); Value += Math.Sign(e.Delta) * Step; }
+
+    protected override bool IsInputKey(Keys k) => k is Keys.Up or Keys.Down || base.IsInputKey(k);
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.KeyCode == Keys.Up) Value += Step;
+        else if (e.KeyCode == Keys.Down) Value -= Step;
+    }
+
+    protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
+    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Invalidate(); }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        NumberBox.PaintField(e.Graphics, this, Focused, hotSpin);
+        var text = new Rectangle(Theme.Dp(10), 0, Spin(0).X - Theme.Dp(12), Height);
+        TextRenderer.DrawText(e.Graphics, Format(value), Font, text, Theme.Text,
+            TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
     }
 }
 

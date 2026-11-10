@@ -9,15 +9,15 @@ public class PrayerOverlay : Form
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.Manual;
         Bounds = Screen.PrimaryScreen!.Bounds;
-        BackColor = Color.FromArgb(10, 16, 38);
+        BackColor = Theme.Bg; // Fluent: the theme's Mica-like base, dimmed by the opacity
         Opacity = 0.93;
         TopMost = true;
         ShowInTaskbar = false;
         KeyPreview = true;
         Cursor = Cursors.Hand;
 
-        var icon = new Label { Text = "🕌", Font = new Font("Segoe UI Emoji", 54f * Theme.UiScale), ForeColor = Color.White, AutoSize = true, Anchor = AnchorStyles.None };
-        var head = new Label { Text = title, Font = Theme.UI(40f, FontStyle.Bold), ForeColor = Color.White, AutoSize = true, Anchor = AnchorStyles.None };
+        var icon = new Label { Text = "🕌", Font = new Font("Segoe UI Emoji", 54f * Theme.UiScale), ForeColor = Theme.Text, AutoSize = true, Anchor = AnchorStyles.None };
+        var head = new Label { Text = title, Font = Theme.UI(40f, FontStyle.Bold), ForeColor = Theme.Text, AutoSize = true, Anchor = AnchorStyles.None };
         var sub = new Label { Text = subtitle, Font = Theme.UI(16f), ForeColor = Theme.Muted, AutoSize = true, Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(8), 0, Theme.Dp(28)) };
         var close = Theme.Button(L.T("OverlayClose"), primary: true);
         close.Anchor = AnchorStyles.None;

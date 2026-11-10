@@ -117,7 +117,7 @@ public class AdhkarForm : Form
             header.MinimumSize = new Size(inner, 0);
             card.Controls.Add(header);
 
-            var ar = Lbl(e.GetProperty("ar").GetString()!, new Font(Name99.ArabicFont, 19f * Theme.UiScale), Theme.Text, 8, inner);
+            var ar = Lbl(e.GetProperty("ar").GetString()!, new Font(QuranText.Family(s.QuranFont), 19f * Theme.UiScale) /* Quran font: draws the ayah-end marks */, Theme.Text, 8, inner);
             ar.RightToLeft = RightToLeft.Yes;
             ar.MinimumSize = new Size(inner, 0);
             ar.TextAlign = ContentAlignment.TopRight;
