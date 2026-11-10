@@ -11,8 +11,8 @@ static class Grid
             SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill, ScrollBars = ScrollBars.Vertical,
             AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells, // row height follows the font, so descenders aren't clipped
-            BackgroundColor = Theme.Card, GridColor = Theme.CardStroke, EnableHeadersVisualStyles = false,
-            CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+            BackgroundColor = Theme.Card, GridColor = Theme.Card, EnableHeadersVisualStyles = false,
+            CellBorderStyle = DataGridViewCellBorderStyle.None,
             ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
             ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
         };
@@ -20,18 +20,40 @@ static class Grid
         g.DefaultCellStyle.ForeColor = Theme.Text;
         g.DefaultCellStyle.SelectionBackColor = Theme.Line;
         g.DefaultCellStyle.SelectionForeColor = Theme.Text;
-        g.DefaultCellStyle.Padding = new Padding(Theme.Dp(10), Theme.Dp(7), Theme.Dp(10), Theme.Dp(7));
+        g.DefaultCellStyle.Padding = new Padding(Theme.Dp(10), Theme.Dp(9), Theme.Dp(10), Theme.Dp(9));
+        g.DefaultCellStyle.Font = Theme.UI(10.5f);
         g.ColumnHeadersDefaultCellStyle.BackColor = Theme.Card;
         g.ColumnHeadersDefaultCellStyle.ForeColor = Theme.Muted;
         g.ColumnHeadersDefaultCellStyle.SelectionBackColor = Theme.Card;
-        g.ColumnHeadersDefaultCellStyle.Font = Theme.UI(9.5f, FontStyle.Bold);
+        g.ColumnHeadersDefaultCellStyle.Font = Theme.UI(9.5f);
         // hover: soft fill on the row under the mouse, like a Fluent list
         g.CellMouseEnter += (_, e) => { if (e.RowIndex >= 0) g.Rows[e.RowIndex].DefaultCellStyle.BackColor = Theme.Line; };
         g.CellMouseLeave += (_, e) => { if (e.RowIndex >= 0) g.Rows[e.RowIndex].DefaultCellStyle.BackColor = Color.Empty; };
-        Theme.Round(g);
+        g.Paint += (_, e) =>
+        {
+            using var line = new Pen(Theme.CardStroke);
+            e.Graphics.DrawLine(line, 0, g.ColumnHeadersHeight - 1, g.Width, g.ColumnHeadersHeight - 1);
+        };
         g.ColumnHeadersDefaultCellStyle.Padding = g.DefaultCellStyle.Padding;
-        g.HandleCreated += (_, _) => Theme.DarkScrollbars(g);
+        g.HandleCreated += (_, _) =>
+        {
+            Theme.DarkScrollbars(g);
+            // the grid's scroll bars are child controls of their own
+            foreach (Control c in g.Controls)
+                if (c is ScrollBar sb)
+                {
+                    if (sb.IsHandleCreated) Theme.DarkScrollbars(sb); else sb.HandleCreated += (_, _) => Theme.DarkScrollbars(sb);
+                }
+        };
         return g;
+    }
+
+    /// The grid on a rounded card with a hairline border, like Wintor's torrent table.
+    public static Panel Card(DataGridView g)
+    {
+        var card = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Card, Padding = new Padding(Theme.Dp(6), Theme.Dp(2), Theme.Dp(6), Theme.Dp(8)) };
+        card.Controls.Add(g);
+        return Theme.Round(card);
     }
 
     public static void Highlight(DataGridViewRow r, Color c)
@@ -49,7 +71,7 @@ public class MonthForm : Form
         Text = L.T("Month") + " — " + s.City.Title;
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(Theme.Dp(1000), Theme.Dp(680));
-        Padding = new Padding(Theme.Dp(12));
+        Padding = new Padding(Theme.Dp(8));
 
         var month = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1);
         var title = new Label { AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, Font = Theme.UI(13f, FontStyle.Bold), ForeColor = Theme.Text };
@@ -59,7 +81,7 @@ public class MonthForm : Form
         bar.Controls.AddRange([title, today, next, prev]);
         var grid = Grid.Create();
         var gap = new Panel { Dock = DockStyle.Top, Height = Theme.Dp(8) };
-        Controls.AddRange([grid, gap, bar]);
+        Controls.AddRange([Grid.Card(grid), gap, bar]);
 
         var cols = Enum.GetValues<P>().Where(p => !s.Hidden.Contains(p)).ToList();
         grid.Columns.Add("d", L.T("Date"));
@@ -109,7 +131,7 @@ public class HolidaysForm : Form
         grid.Columns[1].FillWeight = 300; grid.Columns[2].FillWeight = 170; grid.Columns[3].FillWeight = 80;
         var note = Theme.Label(L.T("HolidayNote"), Theme.Muted, 8.5f);
         note.Dock = DockStyle.Bottom; note.MaximumSize = new Size(Theme.Dp(876), 0); note.Margin = Padding.Empty;
-        Controls.AddRange([grid, note]);
+        Controls.AddRange([Grid.Card(grid), note]);
 
         var today = DateOnly.FromDateTime(DateTime.Today);
         foreach (var h in Hijri.Upcoming(today, s.HijriAdjust))

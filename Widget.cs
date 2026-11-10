@@ -422,11 +422,11 @@ public class Widget : Form
     // Fluent 2 palette from the theme (dark or light): Mica-like base, card layer, accent "next" bar.
     static Color Sky1 => Theme.Bg;
     static Color CardFill => Theme.Card;
-    static Color CardBorder => Theme.Line;
+    static Color CardBorder => Theme.CardStroke;
     static Color Pill => Theme.Line;
     static Color Green => Theme.Accent;
     static Color Grey => Theme.Muted;
-    static Color Speaker => Theme.Muted;
+    static Color Speaker => Theme.Faded;
     static Color Fg => Theme.Text;
     static Color Gold => Theme.Gold;
     static Color GoldBar => Theme.IsDark ? Color.FromArgb(176, 128, 44) : Color.FromArgb(196, 140, 30); // Ramadan
@@ -536,8 +536,7 @@ public class Widget : Form
             // Speaker column sits in the middle of the card, between the names and the times.
             var icon = new RectangleF(Math.Min(card.X + card.Width / 2 + Z(4), box.X - Z(36)), ry, Z(24), h);
             // Volume3 vs Mute: both start at the same x and are nearly the same width, so the column lines up.
-            TextRenderer.DrawText(g, on ? "" : "", icons, Rectangle.Round(icon),
-                on && !s.Muted ? Fg : Speaker, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            Icons.Draw(g, on ? '\uE995' : '\uE74F', new RectangleF(icon.X + (icon.Width - Z(15)) / 2, icon.Y + (icon.Height - Z(15)) / 2, Z(15), Z(15)), on && !s.Muted ? Fg : Speaker);
             bells.Add((icon, r.P));
             ry += h;
         }
@@ -590,8 +589,7 @@ public class Widget : Form
                     using var cb = new SolidBrush(Pill);
                     g.FillPath(cb, chip);
                 }
-                TextRenderer.DrawText(g, toolGlyphs[i], toolFont, Rectangle.Round(tools[i]), i == hotTool ? Fg : Grey,
-                    TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                Icons.Draw(g, toolGlyphs[i][0], new RectangleF(tools[i].X + (tools[i].Width - Z(15)) / 2, tools[i].Y + (tools[i].Height - Z(15)) / 2, Z(15), Z(15)), i == hotTool ? Fg : Grey);
             }
         }
 

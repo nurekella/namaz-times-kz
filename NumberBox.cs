@@ -37,12 +37,12 @@ public class NumberBox : Panel
         Display();
     }
 
-    int SpinW => Theme.Dp(60);
+    int SpinW => Theme.Dp(36);
     Rectangle SpinRect(int i) => SpinRect(Size, i);
 
     /// The ▲ (0) and ▼ (1) buttons inside a field of the given size; shared with Stepper.
     public static Rectangle SpinRect(Size size, int i) =>
-        new(size.Width - Theme.Dp(60) + i * Theme.Dp(28), Theme.Dp(4), Theme.Dp(26), size.Height - Theme.Dp(8));
+        new(size.Width - Theme.Dp(34), i == 0 ? Theme.Dp(3) : size.Height / 2, Theme.Dp(30), size.Height / 2 - Theme.Dp(3));
 
     public decimal Minimum { get => min; set { min = value; Value = this.value; } }
     public decimal Maximum { get => max; set { max = value; Value = this.value; } }
@@ -114,17 +114,14 @@ public class NumberBox : Panel
         using var path = Theme.RoundRect(new RectangleF(0.5f, 0.5f, w - 1.5f, h - 1.5f), rad);
         using (var b = new SolidBrush(Theme.CtlFill)) g.FillPath(b, path);
         using (var p = new Pen(Theme.CtlStroke)) g.DrawPath(p, path);
-        using (var u = new Pen(focused ? Theme.Accent : Theme.Muted, focused ? Theme.Dp(2) : 1))
-            g.DrawLine(u, rad, h - (focused ? Theme.Dp(1) : 1), w - rad, h - (focused ? Theme.Dp(1) : 1));
-        using var icons = new Font(Theme.IconFamily, 7.5f * Theme.UiScale);
-        string[] glyphs = ["\uE70E", "\uE70D"]; // ChevronUp, ChevronDown
-        for (int i = 0; i < 2; i++)
-        {
-            var r = SpinRect(c.Size, i);
-            if (i == hotSpin)
-                using (var hp = Theme.RoundRect(r, rad))
-                using (var hb = new SolidBrush(Theme.Line)) g.FillPath(hb, hp);
-            TextRenderer.DrawText(g, glyphs[i], icons, r, Theme.Muted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-        }
+        if (focused)
+            using (var u = new Pen(Theme.Accent, Theme.Dp(2)))
+                g.DrawLine(u, rad, h - Theme.Dp(1), w - rad, h - Theme.Dp(1));
+        if (hotSpin >= 0)
+            using (var hp = Theme.RoundRect(SpinRect(c.Size, hotSpin), rad))
+            using (var hb = new SolidBrush(Theme.Line)) g.FillPath(hb, hp);
+        // one up-down chevron (WinUI compact spin): its upper half steps up, the lower half down
+        var s = Theme.Dp(16);
+        Icons.Draw(g, "UnfoldMore", new RectangleF(w - Theme.Dp(19) - s / 2f, (h - s) / 2f, s, s), Theme.Muted);
     }
 }

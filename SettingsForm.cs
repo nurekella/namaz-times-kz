@@ -7,6 +7,9 @@ public class SettingsForm : Form
     readonly Settings s;
     readonly Action<bool> changed; // true = language/theme/scale changed, so windows need rebuilding
     readonly TableLayoutPanel body;
+    readonly Panel scroll;
+    /// Every setting card with its title and icon, for the search in the title bar.
+    public readonly List<(string Title, char Glyph, Control Card)> Cards = [];
 
     public SettingsForm(Settings settings, Action<bool> changed, Action? testAlert = null, Func<IWin32Window, Task>? checkUpdates = null)
     {
@@ -18,7 +21,7 @@ public class SettingsForm : Form
 
         body = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Dock = DockStyle.Top, Padding = new Padding(Theme.Dp(8), 0, Theme.Dp(8), Theme.Dp(24)) };
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        var scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Bg };
+        scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Bg };
         scroll.Controls.Add(body);
         scroll.HandleCreated += (_, _) => Theme.DarkScrollbars(scroll);
         Controls.Add(scroll);
@@ -31,7 +34,7 @@ public class SettingsForm : Form
 
         // General
         Header(L.T("General"));
-        var lang = new Segmented(L.Languages.Select(l => l.Name), Array.FindIndex(L.Languages, l => l.Code == s.Lang));
+        var lang = new Dropdown(L.Languages.Select(l => l.Name), Array.FindIndex(L.Languages, l => l.Code == s.Lang));
         lang.Changed += i => Set(() => s.Lang = L.Languages[i].Code, rebuild: true);
         Card('', L.T("Language"), null, lang);
         var cityBtn = Theme.Button(s.City.Title, trailing: '\uE76C');
@@ -43,13 +46,13 @@ public class SettingsForm : Form
             Set(() => s.City = f.Selected);
         };
         Card('', L.T("City"), null, cityBtn);
-        var madhab = new Segmented([L.T("Hanafi"), L.T("OtherMadhabs")], s.Hanafi ? 0 : 1);
+        var madhab = new Dropdown([L.T("Hanafi"), L.T("OtherMadhabs")], s.Hanafi ? 0 : 1);
         madhab.Changed += i => Set(() => s.Hanafi = i == 0);
         Card('', L.T("AsrMethod"), null, madhab);
-        var timeFormat = new Segmented([L.T("H24"), L.T("H12")], s.Hour12 ? 1 : 0);
+        var timeFormat = new Dropdown([L.T("H24"), L.T("H12")], s.Hour12 ? 1 : 0);
         timeFormat.Changed += i => Set(() => s.Hour12 = i == 1);
         Card('', L.T("TimeFormat"), null, timeFormat);
-        var fasting = new Segmented([L.T("FastAuto"), L.T("FastAlways"), L.T("FastOff")], (int)s.Fasting);
+        var fasting = new Dropdown([L.T("FastAuto"), L.T("FastAlways"), L.T("FastOff")], (int)s.Fasting);
         fasting.Changed += i => Set(() => s.Fasting = (FastingMode)i);
         Card('', L.T("FastTimes"), null, fasting);
         var hijri = new Stepper(s.HijriAdjust, -2, 2, 1, v => v > 0 ? $"+{v}" : v.ToString());
@@ -58,7 +61,7 @@ public class SettingsForm : Form
 
         // Appearance
         Header(L.T("Appearance"));
-        var themeMode = new Segmented([L.T("ThemeSystem"), L.T("ThemeDark"), L.T("ThemeLight")], s.ThemeMode);
+        var themeMode = new Dropdown([L.T("ThemeSystem"), L.T("ThemeDark"), L.T("ThemeLight")], s.ThemeMode);
         themeMode.Changed += i => Set(() => s.ThemeMode = i, rebuild: true);
         Card('', L.T("ThemeMode"), null, themeMode);
         var uiScale = new Stepper(s.UiScale, 80, 160, 10, v => v + "%");
@@ -89,8 +92,8 @@ public class SettingsForm : Form
             var off = new Stepper(s.Offsets.GetValueOrDefault(p), -30, 30, 1, v => v > 0 ? $"+{v}" : v.ToString());
             off.ValueChanged += v => Set(() => { if (v == 0) s.Offsets.Remove(p); else s.Offsets[p] = v; });
             row.Controls.AddRange([
-                Labelled(L.T("Show"), Switch(!s.Hidden.Contains(p), v => { if (v) s.Hidden.Remove(p); else s.Hidden.Add(p); })),
-                Labelled(L.T("Notify"), Switch(s.Alerts.Contains(p), v => { if (v) s.Alerts.Add(p); else s.Alerts.Remove(p); })),
+                Labelled(L.T("Show"), Plain(!s.Hidden.Contains(p), v => { if (v) s.Hidden.Remove(p); else s.Hidden.Add(p); })),
+                Labelled(L.T("Notify"), Plain(s.Alerts.Contains(p), v => { if (v) s.Alerts.Add(p); else s.Alerts.Remove(p); })),
                 Labelled(L.T("Offset"), off),
             ]);
             Card('', L.Name(p), null, row);
@@ -114,8 +117,7 @@ public class SettingsForm : Form
         Card('', L.T("Opacity"), null, opacity);
         Card('', L.T("ShowNameOfDay"), null, Switch(s.ShowNameOfDay, v => s.ShowNameOfDay = v));
         Card('', L.T("TopMost"), null, Switch(s.TopMost, v => s.TopMost = v));
-        var autoStart = new Toggle(Widget.AutoStart);
-        autoStart.CheckedChanged += (_, _) => Widget.AutoStart = autoStart.Checked;
+        var autoStart = OnOff(Widget.AutoStart, v => Widget.AutoStart = v);
         Card('', L.T("AutoStart"), null, autoStart);
 
         // About this app: version, updates, backup
@@ -170,11 +172,45 @@ public class SettingsForm : Form
     // Rebuilding disposes this page, so never do it inside the control's own event.
     void Changed(bool rebuild) => BeginInvoke(() => changed(rebuild));
 
-    Toggle Switch(bool value, Action<bool> apply)
+    Control Switch(bool value, Action<bool> apply) => OnOff(value, v => Set(() => apply(v)));
+
+    Toggle Plain(bool value, Action<bool> apply)
     {
-        var t = new Toggle(value) { Anchor = AnchorStyles.Right };
+        var t = new Toggle(value);
         t.CheckedChanged += (_, _) => Set(() => apply(t.Checked));
         return t;
+    }
+
+    /// Windows 11 toggle with its state in words on the left ("On" / "Off"), as Wintor's settings show it.
+    static Control OnOff(bool value, Action<bool> changed)
+    {
+        var t = new Toggle(value) { Margin = new Padding(0, Theme.Dp(6), 0, Theme.Dp(6)) };
+        var l = Theme.Label(L.T(value ? "OnLbl" : "OffLbl"), Theme.Text, 10f);
+        l.Margin = new Padding(0, Theme.Dp(7), Theme.Dp(12), 0);
+        l.Cursor = Cursors.Hand;
+        l.Click += (_, _) => t.Checked = !t.Checked;
+        t.CheckedChanged += (_, _) => { l.Text = L.T(t.Checked ? "OnLbl" : "OffLbl"); changed(t.Checked); };
+        var p = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty, Anchor = AnchorStyles.Right };
+        p.Controls.AddRange([l, t]);
+        return p;
+    }
+
+    /// Scrolls the page so a card found by the title-bar search is in view, and marks it for a moment.
+    public void Reveal(Control card)
+    {
+        BeginInvoke(() =>
+        {
+            scroll.AutoScrollPosition = new Point(0, Math.Max(0, card.Top - Theme.Dp(48)));
+            var back = card.BackColor;
+            card.BackColor = Theme.Marked;
+            var t = new System.Windows.Forms.Timer { Interval = 1200 };
+            t.Tick += (_, _) =>
+            {
+                t.Dispose();
+                card.BackColor = back;
+            };
+            t.Start();
+        });
     }
 
     /// A small caption to the left of a control (used in the prayer rows).
@@ -206,11 +242,8 @@ public class SettingsForm : Form
         card.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         card.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         card.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var icon = new Label
-        {
-            Text = glyph.ToString(), Font = new Font(Theme.IconFamily, 13f * Theme.UiScale), ForeColor = Theme.Text, AutoSize = true,
-            Anchor = AnchorStyles.Left, Margin = new Padding(0, 0, Theme.Dp(16), 0),
-        };
+        var icon = new Control { Size = new Size(Theme.Dp(20), Theme.Dp(20)), Anchor = AnchorStyles.Left, Margin = new Padding(0, 0, Theme.Dp(18), 0) };
+        icon.Paint += (_, e) => Icons.Draw(e.Graphics, glyph, new RectangleF(0, 0, icon.Width, icon.Height), Theme.Text);
         var texts = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Anchor = AnchorStyles.Left, Margin = Padding.Empty };
         var t = Theme.Label(title, Theme.Text, 10.5f);
         t.Margin = Padding.Empty;
@@ -222,10 +255,12 @@ public class SettingsForm : Form
             texts.Controls.Add(h);
         }
         control.Anchor = AnchorStyles.Right;
+        if (control is Stepper) control.Width = Theme.Dp(200); // same width as the drop-downs, like Wintor
         card.Controls.Add(icon, 0, 0);
         card.Controls.Add(texts, 1, 0);
         card.Controls.Add(control, 2, 0);
         body.Controls.Add(Theme.Round(card));
+        Cards.Add((title, glyph, card));
     }
 }
 

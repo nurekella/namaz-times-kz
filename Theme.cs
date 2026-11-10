@@ -3,42 +3,70 @@ using System.Runtime.InteropServices;
 
 namespace NamazTimes;
 
-/// Fluent 2 (Windows 11) look for all windows: palette (dark or light, see SetMode), 4 px controls, 8 px cards,
-/// and a few small owner-drawn controls. The desktop widget keeps its own night palette (Night*).
+/// The app's look, after Wintor: Windows 11 structure (Fluent controls, 4 px controls, 8 px cards) on Tailwind "zinc"
+/// neutrals instead of Fluent's translucent greys, with the user's Windows accent colour. Dark or light (SetMode).
 public static class Theme
 {
-    public static Color Bg, Card, Line, Text, Muted, Accent, OnAccent, Gold, Faded, Marked;
-    // WinUI control fills and the elevation border of buttons
+    /// Chrome = title bar and navigation pane; Bg = the content layer the pages lie on; Card = cards and tables.
+    public static Color Chrome, Bg, Card, Line, Text, Muted, Accent, OnAccent, Gold, Faded, Marked;
+    // control fills and strokes
     public static Color CtlFill, CtlHover, CtlPressed, CtlStroke, CtlStrokeBottom;
-    public static Color CardStroke, Flyout; // card border, menu background
+    public static Color CardStroke, Flyout, NavSelected, Track; // card border, menu background, chosen nav item, empty progress
+    public static Color Blue, Green, Neutral; // progress: in progress, done, segmented track
     public static bool IsDark = true;
-    public static readonly Color NightBg = Color.FromArgb(24, 28, 34), NightLine = Color.FromArgb(48, 54, 64), NightAccent = Color.FromArgb(94, 196, 140);
+    public static readonly Color NightBg = Color.FromArgb(24, 24, 27), NightAccent = Color.FromArgb(34, 197, 94);
 
     static Theme() => SetMode(1);
+
+    // Tailwind zinc
+    static readonly Color Z50 = Hex(0xFAFAFA), Z100 = Hex(0xF4F4F5), Z200 = Hex(0xE4E4E7), Z300 = Hex(0xD4D4D8), Z400 = Hex(0xA1A1AA),
+        Z500 = Hex(0x71717A), Z600 = Hex(0x52525B), Z700 = Hex(0x3F3F46), Z800 = Hex(0x27272A), Z900 = Hex(0x18181B), Z950 = Hex(0x09090B);
+    static Color Hex(int rgb) => Color.FromArgb(255, Color.FromArgb(rgb));
+    static Color Mix(Color a, Color b, float k) => Color.FromArgb((int)(a.R + (b.R - a.R) * k), (int)(a.G + (b.G - a.G) * k), (int)(a.B + (b.B - a.B) * k));
 
     /// 0 = follow Windows, 1 = dark, 2 = light. Takes effect for windows opened afterwards.
     public static void SetMode(int mode)
     {
         IsDark = mode switch { 1 => true, 2 => false, _ => SystemDark() };
+        var (light, dark) = SystemAccent();
         if (IsDark)
         {
-            // Mica base, card layer, subtle stroke / hover fill
-            (Bg, Card, Line) = (Color.FromArgb(32, 32, 32), Color.FromArgb(43, 43, 43), Color.FromArgb(58, 58, 58));
-            (Text, Muted, Accent, OnAccent) = (Color.White, Color.FromArgb(170, 170, 170), Color.FromArgb(108, 203, 143), Color.FromArgb(10, 30, 18));
-            (Gold, Faded, Marked) = (Color.FromArgb(230, 190, 110), Color.FromArgb(110, 110, 110), Color.FromArgb(47, 56, 50));
-            (CtlFill, CtlHover, CtlPressed) = (Color.FromArgb(45, 45, 45), Color.FromArgb(50, 50, 50), Color.FromArgb(39, 39, 39));
-            (CtlStroke, CtlStrokeBottom) = (Color.FromArgb(55, 55, 55), Color.FromArgb(48, 48, 48));
-            (CardStroke, Flyout) = (Color.FromArgb(29, 29, 29), Color.FromArgb(44, 44, 44));
+            (Chrome, Bg, Card, Line) = (Z950, Z900, Z800, Hex(0x343437));
+            (Text, Muted, Faded) = (Z100, Z300, Z400);
+            (Accent, OnAccent) = (light, Z950);
+            (Gold, Marked) = (Hex(0xFBBF24), Mix(Z800, light, 0.14f));
+            (CtlFill, CtlHover, CtlPressed) = (Z800, Hex(0x2F2F33), Hex(0x232326));
+            (CtlStroke, CtlStrokeBottom) = (Z700, Z700);
+            (CardStroke, Flyout, NavSelected, Track) = (Z700, Z800, Hex(0x18181B), Z700);
+            (Blue, Green, Neutral) = (Hex(0x3B82F6), Hex(0x22C55E), Z950);
         }
         else
         {
-            (Bg, Card, Line) = (Color.FromArgb(243, 243, 243), Color.FromArgb(251, 251, 251), Color.FromArgb(229, 229, 229));
-            (Text, Muted, Accent, OnAccent) = (Color.FromArgb(27, 27, 27), Color.FromArgb(97, 97, 97), Color.FromArgb(15, 123, 70), Color.White);
-            (Gold, Faded, Marked) = (Color.FromArgb(154, 103, 0), Color.FromArgb(168, 168, 168), Color.FromArgb(232, 243, 236));
-            (CtlFill, CtlHover, CtlPressed) = (Color.FromArgb(251, 251, 251), Color.FromArgb(246, 246, 246), Color.FromArgb(245, 245, 245));
-            (CtlStroke, CtlStrokeBottom) = (Color.FromArgb(229, 229, 229), Color.FromArgb(204, 204, 204));
-            (CardStroke, Flyout) = (Color.FromArgb(229, 229, 229), Color.FromArgb(249, 249, 249));
+            (Chrome, Bg, Card, Line) = (Z100, Z50, Color.White, Hex(0xEDEDEF));
+            (Text, Muted, Faded) = (Z900, Z600, Z500);
+            (Accent, OnAccent) = (dark, Color.White);
+            (Gold, Marked) = (Hex(0xB45309), Mix(Color.White, dark, 0.09f));
+            (CtlFill, CtlHover, CtlPressed) = (Color.White, Z50, Z100);
+            (CtlStroke, CtlStrokeBottom) = (Z200, Z300);
+            (CardStroke, Flyout, NavSelected, Track) = (Z200, Color.White, Hex(0xE8E8EA), Z200);
+            (Blue, Green, Neutral) = (Hex(0x2563EB), Hex(0x16A34A), Z100);
         }
+    }
+
+    /// The Windows accent colour in its light (for dark mode) and dark (for light mode) shades, as WinUI uses them.
+    static (Color Light, Color Dark) SystemAccent()
+    {
+        try
+        {
+            using var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Accent");
+            if (k?.GetValue("AccentPalette") is byte[] { Length: >= 32 } p)
+            {
+                Color At(int i) => Color.FromArgb(p[i * 4], p[i * 4 + 1], p[i * 4 + 2]);
+                return (At(1), At(4)); // AccentLight2, AccentDark1
+            }
+        }
+        catch { }
+        return (Hex(0x99EBFF), Hex(0x005FB8)); // Windows default blue
     }
 
     static bool SystemDark()
@@ -79,7 +107,7 @@ public static class Theme
         {
             int dark = IsDark ? 1 : 0;
             DwmSetWindowAttribute(f.Handle, 20 /*DWMWA_USE_IMMERSIVE_DARK_MODE*/, ref dark, sizeof(int));
-            int caption = ColorTranslator.ToWin32(Bg), text = ColorTranslator.ToWin32(Text), border = ColorTranslator.ToWin32(Line);
+            int caption = ColorTranslator.ToWin32(Chrome), text = ColorTranslator.ToWin32(Text), border = ColorTranslator.ToWin32(CardStroke);
             DwmSetWindowAttribute(f.Handle, 35 /*DWMWA_CAPTION_COLOR*/, ref caption, sizeof(int));
             DwmSetWindowAttribute(f.Handle, 36 /*DWMWA_TEXT_COLOR*/, ref text, sizeof(int));
             DwmSetWindowAttribute(f.Handle, 34 /*DWMWA_BORDER_COLOR*/, ref border, sizeof(int));
@@ -106,14 +134,10 @@ public static class Theme
         using (var g = Graphics.FromImage(bmp))
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             using var tile = RoundRect(new RectangleF(2, 2, size - 4, size - 4), 14);
-            using var b = new SolidBrush(NightAccent);
+            using var b = new SolidBrush(Accent);
             g.FillPath(b, tile);
-            using var font = new Font(IconFamily, 34, GraphicsUnit.Pixel);
-            using var fg = new SolidBrush(NightBg);
-            g.DrawString(glyph.ToString(), font, fg, new RectangleF(0, 2, size, size),
-                new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
+            Icons.Draw(g, glyph, new RectangleF(14, 14, size - 28, size - 28), OnAccent);
         }
         return Icon.FromHandle(bmp.GetHicon());
     }
@@ -167,6 +191,7 @@ public static class Theme
     {
         Text = text, Glyph = glyph, Trailing = trailing, AutoSize = true, Cursor = Cursors.Hand,
         BackColor = primary ? Accent : Card, ForeColor = primary ? OnAccent : Text, Font = UI(10f),
+        Subtle = !primary && text.Length == 0, // icon-only: a command-bar button, no frame until hovered
     };
 
     /// On/off switch with a label; clicking the label toggles it too.
@@ -246,18 +271,7 @@ public static class Theme
         Tag = glyph, Padding = new Padding(0, Dp(7), Dp(16), Dp(7)),
     };
 
-    public static Bitmap Glyph(char glyph, Color color)
-    {
-        var size = Dp(18);
-        var bmp = new Bitmap(size, size);
-        using var g = Graphics.FromImage(bmp);
-        g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit; // ClearType would fringe on transparent
-        using var f = new Font(IconFamily, size * 0.62f, GraphicsUnit.Pixel);
-        using var b = new SolidBrush(color);
-        g.DrawString(glyph.ToString(), f, b, new RectangleF(0, 0, size, size),
-            new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
-        return bmp;
-    }
+    public static Bitmap Glyph(char glyph, Color color) => Icons.Bitmap(glyph, Dp(16), color);
 
     class MenuRenderer : ToolStripProfessionalRenderer
     {
@@ -297,12 +311,8 @@ public static class Theme
         {
             if (e.Item.Tag is not char glyph) { if (e.Image != null) e.Graphics.DrawImage(e.Image, e.ImageRectangle); return; }
             var color = e.Item is ToolStripMenuItem { Checked: true } ? Accent : e.Item.Enabled ? Text : Faded;
-            var key = (glyph, color.ToArgb());
-            if (!Icons.TryGetValue(key, out var img)) Icons[key] = img = Glyph(glyph, color);
-            e.Graphics.DrawImage(img, e.ImageRectangle);
+            NamazTimes.Icons.Draw(e.Graphics, glyph, e.ImageRectangle, color);
         }
-
-        static readonly Dictionary<(char, int), Bitmap> Icons = [];
 
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
@@ -337,6 +347,8 @@ public class RoundButton : Button
     public char Glyph;
     /// Small glyph after the text, e.g. a chevron for buttons that open a menu or a picker.
     public char Trailing;
+    /// Command-bar style: no fill or border until hovered (icon-only buttons in toolbars).
+    public bool Subtle;
 
     public RoundButton()
     {
@@ -350,18 +362,13 @@ public class RoundButton : Button
     protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); if (e.Button == MouseButtons.Left) { down = true; Invalidate(); } }
     protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); down = false; Invalidate(); }
 
-    Font IconFont => icon ??= new Font(Theme.IconFamily, Font.SizeInPoints * 0.92f);
-    Font SmallIcon => small ??= new Font(Theme.IconFamily, Font.SizeInPoints * 0.62f);
-    Font? icon, small;
-    protected override void OnFontChanged(EventArgs e) { icon?.Dispose(); small?.Dispose(); icon = small = null; base.OnFontChanged(e); }
-
     int GlyphW => Glyph == '\0' ? 0 : Theme.Dp(16) + (Text.Length > 0 ? Theme.Dp(8) : 0);
     int TrailW => Trailing == '\0' ? 0 : Theme.Dp(8) + Theme.Dp(12);
 
     public override Size GetPreferredSize(Size proposed)
     {
         var text = Text.Length > 0 ? TextRenderer.MeasureText(Text, Font, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine) : Size.Empty;
-        var pad = Text.Length > 0 ? Theme.Dp(12) : Theme.Dp(8);
+        var pad = Text.Length > 0 || Subtle ? Theme.Dp(12) : Theme.Dp(8);
         return new Size(Math.Max(Theme.Dp(32), pad * 2 + GlyphW + text.Width + TrailW), Math.Max(Theme.Dp(32), text.Height + Theme.Dp(12)));
     }
 
@@ -379,13 +386,14 @@ public class RoundButton : Button
             fill = down ? Blend(Theme.Accent, Theme.Bg, 0.8f) : hot ? Blend(Theme.Accent, Theme.Bg, 0.9f) : Theme.Accent;
             fg = down ? Blend(Theme.OnAccent, Theme.Accent, 0.8f) : Theme.OnAccent;
         }
+        else if (Subtle) (fill, fg) = (down ? Theme.CtlPressed : hot ? Theme.Line : Parent?.BackColor ?? Theme.Bg, down ? Theme.Muted : ForeColor);
         else (fill, fg) = (down ? Theme.CtlPressed : hot ? Theme.CtlHover : Theme.CtlFill, down ? Theme.Muted : ForeColor);
 
         int rad = Theme.Dp(Theme.ControlRadius);
         var r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
         using var path = Theme.RoundRect(r, rad);
         using (var b = new SolidBrush(fill)) g.FillPath(b, path);
-        if (!down)
+        if (!down && !Subtle)
         {
             // Elevation border: hairline all round, a stronger line along the bottom
             if (!accent) using (var p = new Pen(Theme.CtlStroke)) g.DrawPath(p, path);
@@ -393,13 +401,13 @@ public class RoundButton : Button
             g.DrawLine(bottom, rad, Height - 1, Width - rad - 1, Height - 1);
         }
 
+        if (!DrawContent) return;
         // Icon + text + chevron, centred as one group
         var textW = Text.Length > 0 ? TextRenderer.MeasureText(g, Text, Font, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width : 0;
         var x = (Width - (GlyphW + textW + TrailW)) / 2;
         if (Glyph != '\0')
         {
-            TextRenderer.DrawText(g, Glyph.ToString(), IconFont, new Rectangle(x, 0, Theme.Dp(16), Height), fg,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            Icons.Draw(g, Glyph, new RectangleF(x, (Height - Theme.Dp(16)) / 2f, Theme.Dp(16), Theme.Dp(16)), fg);
             x += GlyphW;
         }
         if (textW > 0)
@@ -409,11 +417,13 @@ public class RoundButton : Button
             x += textW;
         }
         if (Trailing != '\0')
-            TextRenderer.DrawText(g, Trailing.ToString(), SmallIcon, new Rectangle(x + Theme.Dp(8), 0, Theme.Dp(12), Height), accent ? fg : Theme.Muted,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            Icons.Draw(g, Trailing, new RectangleF(x + Theme.Dp(8), (Height - Theme.Dp(12)) / 2f, Theme.Dp(12), Theme.Dp(12)), accent ? fg : Theme.Muted);
     }
 
-    static Color Blend(Color a, Color b, float k) =>
+    /// False for controls that draw their own content over the button field (Dropdown).
+    protected virtual bool DrawContent => true;
+
+    public static Color Blend(Color a, Color b, float k) =>
         Color.FromArgb((int)(a.R * k + b.R * (1 - k)), (int)(a.G * k + b.G * (1 - k)), (int)(a.B * k + b.B * (1 - k)));
 }
 
@@ -421,16 +431,18 @@ public class RoundButton : Button
 public class SearchBox : Panel
 {
     public readonly TextBox Box;
+    readonly Color fill;
 
-    public SearchBox(string placeholder)
+    public SearchBox(string placeholder, Color? fill = null)
     {
-        Height = Theme.Dp(36);
-        Padding = new Padding(Theme.Dp(34), Theme.Dp(8), Theme.Dp(10), 0);
-        BackColor = Theme.Card;
+        this.fill = fill ?? Theme.CtlFill;
+        Height = Theme.Dp(32);
+        Padding = new Padding(Theme.Dp(36), Theme.Dp(7), Theme.Dp(10), 0);
+        BackColor = this.fill;
         DoubleBuffered = true;
         Box = new TextBox
         {
-            Dock = DockStyle.Fill, BorderStyle = BorderStyle.None, BackColor = Theme.Card, ForeColor = Theme.Text,
+            Dock = DockStyle.Fill, BorderStyle = BorderStyle.None, BackColor = this.fill, ForeColor = Theme.Text,
             Font = Theme.UI(10.5f), PlaceholderText = placeholder,
         };
         Controls.Add(Box);
@@ -446,15 +458,13 @@ public class SearchBox : Panel
         g.Clear(Parent?.BackColor ?? Theme.Bg);
         g.SmoothingMode = SmoothingMode.AntiAlias;
         using var path = Theme.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), Theme.Dp(Theme.ControlRadius));
-        using (var b = new SolidBrush(Theme.Card)) g.FillPath(b, path);
-        using (var p = new Pen(Theme.Line)) g.DrawPath(p, path);
-        // underline: grey at rest, 2 px accent while typing
-        var focused = Box.Focused;
-        using (var u = new Pen(focused ? Theme.Accent : Theme.Muted, focused ? Theme.Dp(2) : 1))
-            g.DrawLine(u, Theme.Dp(Theme.ControlRadius), Height - (focused ? Theme.Dp(1) : 1), Width - Theme.Dp(Theme.ControlRadius), Height - (focused ? Theme.Dp(1) : 1));
-        using var icon = new Font(Theme.IconFamily, 10f * Theme.UiScale);
-        TextRenderer.DrawText(g, "", icon, new Rectangle(Theme.Dp(10), 0, Theme.Dp(20), Height), Theme.Muted,
-            TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter);
+        using (var b = new SolidBrush(fill)) g.FillPath(b, path);
+        using (var p = new Pen(Theme.CtlStroke)) g.DrawPath(p, path);
+        // 2 px accent underline while typing
+        if (Box.Focused)
+            using (var u = new Pen(Theme.Accent, Theme.Dp(2)))
+                g.DrawLine(u, Theme.Dp(Theme.ControlRadius), Height - Theme.Dp(1), Width - Theme.Dp(Theme.ControlRadius), Height - Theme.Dp(1));
+        Icons.Draw(g, "Search01", new RectangleF(Theme.Dp(12), (Height - Theme.Dp(16)) / 2f, Theme.Dp(16), Theme.Dp(16)), Theme.Muted);
     }
 }
 
@@ -491,11 +501,16 @@ public class Toggle : Control
         var r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
         using var track = Theme.RoundRect(r, r.Height / 2);
         if (on) using (var fill = new SolidBrush(Theme.Accent)) g.FillPath(fill, track);
-        else using (var stroke = new Pen(Theme.Muted)) g.DrawPath(stroke, track);
-        var d = r.Height - Theme.Dp(8);
-        var x = on ? r.Right - d - Theme.Dp(4) : r.X + Theme.Dp(4);
+        else
+        {
+            using (var bg = new SolidBrush(Theme.CtlFill)) g.FillPath(bg, track);
+            using var stroke = new Pen(Theme.Muted);
+            g.DrawPath(stroke, track);
+        }
+        var d = r.Height - Theme.Dp(on ? 8 : 10);
+        var x = on ? r.Right - d - Theme.Dp(4) : r.X + Theme.Dp(5);
         using var knob = new SolidBrush(on ? Theme.OnAccent : Theme.Muted);
-        g.FillEllipse(knob, x, r.Y + Theme.Dp(4), d, d);
+        g.FillEllipse(knob, x, r.Y + (r.Height - d) / 2, d, d);
     }
 }
 
@@ -587,7 +602,7 @@ public class Segmented : FlowLayoutPanel
     {
         AutoSize = true; WrapContents = false; Margin = new Padding(0, Theme.Dp(2), 0, Theme.Dp(2)); Anchor = AnchorStyles.Left;
         Padding = new Padding(Theme.Dp(3));
-        BackColor = Theme.Card;
+        BackColor = Theme.Neutral;
         DoubleBuffered = true;
         foreach (var o in options)
         {
@@ -624,15 +639,76 @@ public class Segmented : FlowLayoutPanel
             if (Checked || hot)
             {
                 using var pill = Theme.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), Theme.Dp(Theme.ControlRadius));
-                using var b = new SolidBrush(Checked ? Theme.Accent : Theme.Line);
+                using var b = new SolidBrush(Checked ? Theme.Card : Theme.Line);
                 g.FillPath(b, pill);
+                if (Checked) using (var p = new Pen(Theme.CardStroke)) g.DrawPath(p, pill);
             }
-            TextRenderer.DrawText(g, Text, Font, ClientRectangle, Checked ? Theme.OnAccent : Theme.Text,
+            TextRenderer.DrawText(g, Text, Font, ClientRectangle, Checked ? Theme.Text : Theme.Muted,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
         }
 
         // Radio buttons size for their check circle; a pill only needs the text plus padding.
         public override Size GetPreferredSize(Size proposed) =>
             TextRenderer.MeasureText(Text, Font) + new Size(Padding.Horizontal + Theme.Dp(6), Padding.Vertical + Theme.Dp(10));
+    }
+}
+
+/// Windows 11 ComboBox, as in Wintor's settings: a 200 px field with the chosen option and a chevron;
+/// clicking opens a menu of the options with the current one marked.
+public class Dropdown : RoundButton
+{
+    readonly string[] options;
+    int selected;
+    public event Action<int>? Changed;
+
+    public Dropdown(IEnumerable<string> options, int selected)
+    {
+        this.options = options.ToArray();
+        this.selected = Math.Clamp(selected, 0, this.options.Length - 1);
+        AutoSize = false;
+        Size = new Size(Theme.Dp(200), Theme.Dp(32));
+        Font = Theme.UI(10f);
+        BackColor = Theme.CtlFill; ForeColor = Theme.Text;
+        Cursor = Cursors.Hand;
+        Text = this.options[this.selected];
+        Click += (_, _) =>
+        {
+            var m = Theme.Menu();
+            m.ShowImageMargin = false;
+            for (int i = 0; i < this.options.Length; i++)
+            {
+                var k = i;
+                var item = new ToolStripMenuItem(this.options[i]) { Checked = i == this.selected, Padding = new Padding(Theme.Dp(8), Theme.Dp(7), Theme.Dp(16), Theme.Dp(7)) };
+                item.Click += (_, _) => Selected = k;
+                m.Items.Add(item);
+            }
+            m.MinimumSize = new Size(Width, 0);
+            m.Show(this, new Point(0, Height + Theme.Dp(2)));
+        };
+    }
+
+    public int Selected
+    {
+        get => selected;
+        set
+        {
+            value = Math.Clamp(value, 0, options.Length - 1);
+            if (value == selected) return;
+            selected = value;
+            Text = options[value];
+            Invalidate();
+            Changed?.Invoke(value);
+        }
+    }
+
+    public override Size GetPreferredSize(Size proposed) => Size;
+    protected override bool DrawContent => false;
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e); // the field: fill, elevation border, hover (DrawContent is off, so no centred text)
+        TextRenderer.DrawText(e.Graphics, Text, Font, new Rectangle(Theme.Dp(11), 0, Width - Theme.Dp(44), Height), Enabled ? Theme.Text : Theme.Faded,
+            TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+        Icons.Draw(e.Graphics, "ArrowDown01", new RectangleF(Width - Theme.Dp(28), (Height - Theme.Dp(14)) / 2f, Theme.Dp(14), Theme.Dp(14)), Theme.Muted);
     }
 }
