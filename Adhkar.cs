@@ -37,7 +37,7 @@ public class AdhkarForm : Form
 
         var which = new Segmented([L.T("AdhkarMorning"), L.T("AdhkarEvening")], morning ? 0 : 1) { Margin = new Padding(0, 0, Theme.Dp(16), 0) };
         progress = Theme.Label("", Theme.Accent, 11f, FontStyle.Bold);
-        var reset = Theme.Button("↺");
+        var reset = Theme.Button("", glyph: '\uE72C'); // Refresh
         var top = new FlowLayoutPanel { Dock = DockStyle.Top, Height = Theme.Dp(50), WrapContents = false };
         top.Controls.AddRange([which, progress, reset]);
         var hint = Theme.Label(L.T("AdhkarCountHint"), Theme.Muted, 8.5f);

@@ -48,7 +48,7 @@ public class MonthForm : Form
 
         var month = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1);
         var title = new Label { AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, Font = Theme.UI(13f, FontStyle.Bold), ForeColor = Theme.Text };
-        var prev = Theme.Button("‹"); var next = Theme.Button("›"); var today = Theme.Button(char.ToUpper(L.T("Today")[0]) + L.T("Today")[1..]);
+        var prev = Theme.Button("", glyph: '\uE76B'); var next = Theme.Button("", glyph: '\uE76C'); var today = Theme.Button(char.ToUpper(L.T("Today")[0]) + L.T("Today")[1..]);
         prev.Dock = next.Dock = DockStyle.Left; today.Dock = DockStyle.Right;
         var bar = new Panel { Dock = DockStyle.Top, Height = Theme.Dp(40) };
         bar.Controls.AddRange([title, today, next, prev]);

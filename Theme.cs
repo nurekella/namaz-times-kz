@@ -8,6 +8,8 @@ namespace NamazTimes;
 public static class Theme
 {
     public static Color Bg, Card, Line, Text, Muted, Accent, OnAccent, Gold, Faded, Marked;
+    // WinUI control fills and the elevation border of buttons
+    public static Color CtlFill, CtlHover, CtlPressed, CtlStroke, CtlStrokeBottom;
     public static bool IsDark = true;
     public static readonly Color NightBg = Color.FromArgb(24, 28, 34), NightLine = Color.FromArgb(48, 54, 64), NightAccent = Color.FromArgb(94, 196, 140);
 
@@ -23,12 +25,16 @@ public static class Theme
             (Bg, Card, Line) = (Color.FromArgb(32, 32, 32), Color.FromArgb(43, 43, 43), Color.FromArgb(58, 58, 58));
             (Text, Muted, Accent, OnAccent) = (Color.White, Color.FromArgb(170, 170, 170), Color.FromArgb(108, 203, 143), Color.FromArgb(10, 30, 18));
             (Gold, Faded, Marked) = (Color.FromArgb(230, 190, 110), Color.FromArgb(110, 110, 110), Color.FromArgb(47, 56, 50));
+            (CtlFill, CtlHover, CtlPressed) = (Color.FromArgb(45, 45, 45), Color.FromArgb(50, 50, 50), Color.FromArgb(39, 39, 39));
+            (CtlStroke, CtlStrokeBottom) = (Color.FromArgb(55, 55, 55), Color.FromArgb(48, 48, 48));
         }
         else
         {
             (Bg, Card, Line) = (Color.FromArgb(243, 243, 243), Color.FromArgb(251, 251, 251), Color.FromArgb(229, 229, 229));
             (Text, Muted, Accent, OnAccent) = (Color.FromArgb(27, 27, 27), Color.FromArgb(97, 97, 97), Color.FromArgb(15, 123, 70), Color.White);
             (Gold, Faded, Marked) = (Color.FromArgb(154, 103, 0), Color.FromArgb(168, 168, 168), Color.FromArgb(232, 243, 236));
+            (CtlFill, CtlHover, CtlPressed) = (Color.FromArgb(251, 251, 251), Color.FromArgb(246, 246, 246), Color.FromArgb(245, 245, 245));
+            (CtlStroke, CtlStrokeBottom) = (Color.FromArgb(229, 229, 229), Color.FromArgb(204, 204, 204));
         }
     }
 
@@ -48,6 +54,8 @@ public static class Theme
     public static int Dp(int v) => (int)Math.Round(v * Dpi / 96f * UiScale);
 
     // Windows 11 ships Segoe UI Variable, which reads better; Windows 10 falls back to Segoe UI.
+    // Windows 11 icon font (same code points as Segoe MDL2 Assets, which Windows 10 has)
+    public static readonly string IconFamily = FontFamily.Families.Any(f => f.Name == "Segoe Fluent Icons") ? "Segoe Fluent Icons" : "Segoe MDL2 Assets";
     public static readonly bool Variable = FontFamily.Families.Any(f => f.Name == "Segoe UI Variable Text");
     public static Font UI(float size = 10f, FontStyle style = FontStyle.Regular) => Variable
         ? new(style.HasFlag(FontStyle.Bold) ? "Segoe UI Variable Text Semibold" : "Segoe UI Variable Text", size * UiScale, style & ~FontStyle.Bold)
@@ -99,7 +107,7 @@ public static class Theme
             using var tile = RoundRect(new RectangleF(2, 2, size - 4, size - 4), 14);
             using var b = new SolidBrush(NightAccent);
             g.FillPath(b, tile);
-            using var font = new Font("Segoe MDL2 Assets", 34, GraphicsUnit.Pixel);
+            using var font = new Font(IconFamily, 34, GraphicsUnit.Pixel);
             using var fg = new SolidBrush(NightBg);
             g.DrawString(glyph.ToString(), font, fg, new RectangleF(0, 2, size, size),
                 new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
@@ -131,12 +139,10 @@ public static class Theme
         Anchor = AnchorStyles.Left, Margin = new Padding(0, Dp(7), Dp(12), Dp(7)),
     };
 
-    public static Button Button(string text, bool primary = false) => new RoundButton
+    public static RoundButton Button(string text, bool primary = false, char glyph = '\0', char trailing = '\0') => new()
     {
-        Text = text, AutoSize = true, Cursor = Cursors.Hand,
-        BackColor = primary ? Accent : Card, ForeColor = primary ? OnAccent : Text,
-        Font = UI(10f, primary ? FontStyle.Bold : FontStyle.Regular),
-        Padding = new Padding(Dp(10), Dp(3), Dp(10), Dp(3)),
+        Text = text, Glyph = glyph, Trailing = trailing, AutoSize = true, Cursor = Cursors.Hand,
+        BackColor = primary ? Accent : Card, ForeColor = primary ? OnAccent : Text, Font = UI(10f),
     };
 
     /// On/off switch with a label; clicking the label toggles it too.
@@ -222,7 +228,7 @@ public static class Theme
         var bmp = new Bitmap(size, size);
         using var g = Graphics.FromImage(bmp);
         g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit; // ClearType would fringe on transparent
-        using var f = new Font("Segoe MDL2 Assets", size * 0.62f, GraphicsUnit.Pixel);
+        using var f = new Font(IconFamily, size * 0.62f, GraphicsUnit.Pixel);
         using var b = new SolidBrush(color);
         g.DrawString(glyph.ToString(), f, b, new RectangleF(0, 0, size, size),
             new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
@@ -294,10 +300,16 @@ public static class Theme
     [DllImport("uxtheme.dll", CharSet = CharSet.Unicode)] static extern int SetWindowTheme(IntPtr h, string? app, string? idList);
 }
 
-/// Flat button with rounded corners; hover lightens it. BackColor/ForeColor as with a normal button.
+/// Windows 11 (WinUI) button: 32 px tall, 4 px corners, elevation stroke (bottom edge stronger),
+/// hover and pressed fills, optional icon before the text and a chevron after it.
+/// BackColor == Theme.Accent makes it an accent button.
 public class RoundButton : Button
 {
-    bool hot;
+    bool hot, down;
+    /// Segoe Fluent Icons / MDL2 glyph shown before the text (or alone).
+    public char Glyph;
+    /// Small glyph after the text, e.g. a chevron for buttons that open a menu or a picker.
+    public char Trailing;
 
     public RoundButton()
     {
@@ -307,28 +319,75 @@ public class RoundButton : Button
     }
 
     protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); hot = true; Invalidate(); }
-    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hot = false; Invalidate(); }
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); hot = down = false; Invalidate(); }
+    protected override void OnMouseDown(MouseEventArgs e) { base.OnMouseDown(e); if (e.Button == MouseButtons.Left) { down = true; Invalidate(); } }
+    protected override void OnMouseUp(MouseEventArgs e) { base.OnMouseUp(e); down = false; Invalidate(); }
+
+    Font IconFont => icon ??= new Font(Theme.IconFamily, Font.SizeInPoints * 0.92f);
+    Font SmallIcon => small ??= new Font(Theme.IconFamily, Font.SizeInPoints * 0.62f);
+    Font? icon, small;
+    protected override void OnFontChanged(EventArgs e) { icon?.Dispose(); small?.Dispose(); icon = small = null; base.OnFontChanged(e); }
+
+    int GlyphW => Glyph == '\0' ? 0 : Theme.Dp(16) + (Text.Length > 0 ? Theme.Dp(8) : 0);
+    int TrailW => Trailing == '\0' ? 0 : Theme.Dp(8) + Theme.Dp(12);
+
+    public override Size GetPreferredSize(Size proposed)
+    {
+        var text = Text.Length > 0 ? TextRenderer.MeasureText(Text, Font, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine) : Size.Empty;
+        var pad = Text.Length > 0 ? Theme.Dp(12) : Theme.Dp(8);
+        return new Size(Math.Max(Theme.Dp(32), pad * 2 + GlyphW + text.Width + TrailW), Math.Max(Theme.Dp(32), text.Height + Theme.Dp(12)));
+    }
 
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
         g.Clear(Parent?.BackColor ?? Theme.Bg);
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        var primary = BackColor == Theme.Accent;
-        var fill = !Enabled ? Theme.Card : hot ? (primary ? ControlPaint.Light(BackColor, 0.25f) : Theme.Line) : BackColor;
-        var r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
-        using var path = Theme.RoundRect(r, Theme.Dp(Theme.ControlRadius));
-        using (var b = new SolidBrush(fill)) g.FillPath(b, path);
-        if (!primary)
+        var accent = BackColor == Theme.Accent;
+        Color fill, fg;
+        if (!Enabled) (fill, fg) = (Theme.CtlFill, Theme.Faded);
+        else if (accent)
         {
-            using (var p = new Pen(Theme.Line)) g.DrawPath(p, path);
-            // Fluent "elevation" stroke: the bottom edge is a touch stronger
-            using var bottom = new Pen(Theme.IsDark ? Theme.Line : ControlPaint.Dark(Theme.Line, 0.05f));
-            g.DrawLine(bottom, Theme.Dp(Theme.ControlRadius), Height - 1, Width - Theme.Dp(Theme.ControlRadius), Height - 1);
+            // WinUI accent: 90 % on hover, 80 % while pressed
+            fill = down ? Blend(Theme.Accent, Theme.Bg, 0.8f) : hot ? Blend(Theme.Accent, Theme.Bg, 0.9f) : Theme.Accent;
+            fg = down ? Blend(Theme.OnAccent, Theme.Accent, 0.8f) : Theme.OnAccent;
         }
-        TextRenderer.DrawText(g, Text, Font, ClientRectangle, Enabled ? ForeColor : Theme.Muted,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
+        else (fill, fg) = (down ? Theme.CtlPressed : hot ? Theme.CtlHover : Theme.CtlFill, down ? Theme.Muted : ForeColor);
+
+        int rad = Theme.Dp(Theme.ControlRadius);
+        var r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
+        using var path = Theme.RoundRect(r, rad);
+        using (var b = new SolidBrush(fill)) g.FillPath(b, path);
+        if (!down)
+        {
+            // Elevation border: hairline all round, a stronger line along the bottom
+            if (!accent) using (var p = new Pen(Theme.CtlStroke)) g.DrawPath(p, path);
+            using var bottom = new Pen(accent ? Blend(Color.Black, Theme.Accent, Theme.IsDark ? 0.15f : 0.25f) : Theme.CtlStrokeBottom);
+            g.DrawLine(bottom, rad, Height - 1, Width - rad - 1, Height - 1);
+        }
+
+        // Icon + text + chevron, centred as one group
+        var textW = Text.Length > 0 ? TextRenderer.MeasureText(g, Text, Font, Size.Empty, TextFormatFlags.NoPadding | TextFormatFlags.SingleLine).Width : 0;
+        var x = (Width - (GlyphW + textW + TrailW)) / 2;
+        if (Glyph != '\0')
+        {
+            TextRenderer.DrawText(g, Glyph.ToString(), IconFont, new Rectangle(x, 0, Theme.Dp(16), Height), fg,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            x += GlyphW;
+        }
+        if (textW > 0)
+        {
+            TextRenderer.DrawText(g, Text, Font, new Rectangle(x, 0, textW + 2, Height), fg,
+                TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+            x += textW;
+        }
+        if (Trailing != '\0')
+            TextRenderer.DrawText(g, Trailing.ToString(), SmallIcon, new Rectangle(x + Theme.Dp(8), 0, Theme.Dp(12), Height), accent ? fg : Theme.Muted,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
     }
+
+    static Color Blend(Color a, Color b, float k) =>
+        Color.FromArgb((int)(a.R * k + b.R * (1 - k)), (int)(a.G * k + b.G * (1 - k)), (int)(a.B * k + b.B * (1 - k)));
 }
 
 /// Text box with a magnifier, rounded corners and no white Windows border.
@@ -366,7 +425,7 @@ public class SearchBox : Panel
         var focused = Box.Focused;
         using (var u = new Pen(focused ? Theme.Accent : Theme.Muted, focused ? Theme.Dp(2) : 1))
             g.DrawLine(u, Theme.Dp(Theme.ControlRadius), Height - (focused ? Theme.Dp(1) : 1), Width - Theme.Dp(Theme.ControlRadius), Height - (focused ? Theme.Dp(1) : 1));
-        using var icon = new Font("Segoe MDL2 Assets", 10f * Theme.UiScale);
+        using var icon = new Font(Theme.IconFamily, 10f * Theme.UiScale);
         TextRenderer.DrawText(g, "", icon, new Rectangle(Theme.Dp(10), 0, Theme.Dp(20), Height), Theme.Muted,
             TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter);
     }
@@ -430,17 +489,17 @@ public class Stepper : FlowLayoutPanel
         Anchor = AnchorStyles.Left;
         text = new Label
         {
-            AutoSize = false, Width = Theme.Dp(64), Height = Theme.Dp(28), TextAlign = ContentAlignment.MiddleCenter,
+            AutoSize = false, Width = Theme.Dp(64), Height = Theme.Dp(32), TextAlign = ContentAlignment.MiddleCenter,
             ForeColor = Theme.Text, Font = Theme.UI(10f), Margin = Padding.Empty,
         };
-        Controls.AddRange([Btn("−", -1), text, Btn("+", 1)]);
+        Controls.AddRange([Btn('\uE738', -1), text, Btn('\uE710', 1)]); // Remove, Add
         Value = value;
     }
 
-    Button Btn(string s, int dir)
+    Button Btn(char glyph, int dir)
     {
-        var b = Theme.Button(s);
-        b.AutoSize = false; b.Size = new Size(Theme.Dp(28), Theme.Dp(28)); b.Padding = Padding.Empty; b.Margin = Padding.Empty;
+        var b = Theme.Button("", glyph: glyph);
+        b.AutoSize = false; b.Size = new Size(Theme.Dp(32), Theme.Dp(32)); b.Margin = Padding.Empty;
         b.Click += (_, _) => Value += dir * Step;
         return b;
     }

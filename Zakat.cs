@@ -39,7 +39,7 @@ public class ZakatForm : Form
             var n = new NumericUpDown
             {
                 Maximum = 100_000_000_000m, DecimalPlaces = decimals, ThousandsSeparator = true, Value = Math.Clamp(value, 0, 100_000_000_000m),
-                Width = Theme.Dp(170), Font = Theme.UI(10.5f), BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle,
+                Width = Theme.Dp(170), Font = Theme.UI(10.5f), BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.None,
                 TextAlign = HorizontalAlignment.Right, Anchor = AnchorStyles.Left, Margin = new Padding(0, Theme.Dp(3), 0, Theme.Dp(3)),
             };
             n.ValueChanged += (_, _) => { set(n.Value); Recalc(); };

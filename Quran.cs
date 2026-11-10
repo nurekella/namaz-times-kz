@@ -127,7 +127,7 @@ public class QuranForm : Form
         void ShowRu() => ruButton.Visible = s.QuranMeaning && s.QuranTrans == "ru"; // shown while "Русский" is picked
         var translitSwitch = Theme.Switch(L.T("QuranTranslit"), s.QuranTranslit, out var translit);
         var tajweedSwitch = Theme.Switch(L.T("Tajweed"), s.QuranTajweed, out var tajweed);
-        var colours = Theme.Button(L.T("TjColours"));
+        var colours = Theme.Button(L.T("TjColours"), trailing: '\uE70D');
         colours.Margin = new Padding(0, Theme.Dp(2), Theme.Dp(8), Theme.Dp(2));
         var size = new Stepper(s.QuranSize, 14, 40, 2);
         bar.Controls.AddRange([font, trans, ruButton, translitSwitch, tajweedSwitch, colours, Caption("QuranSize"), size]); // the font and language names speak for themselves
@@ -186,7 +186,8 @@ public class QuranForm : Form
         {
             colours.Visible = s.QuranTajweed;
             legend.Visible = s.QuranTajweed && s.QuranLegend;
-            colours.Text = L.T("TjColours") + (legend.Visible ? "  ▴" : "  ▾");
+            colours.Trailing = legend.Visible ? '\uE70E' : '\uE70D'; // ChevronUp / ChevronDown
+            colours.Invalidate();
         }
         colours.Click += (_, _) => { s.QuranLegend = !s.QuranLegend; Data.Save(s); ShowLegend(); };
         ShowLegend();
@@ -209,13 +210,13 @@ public class QuranForm : Form
     /// A button showing the current choice; clicking it opens a menu of the others.
     static Button Drop(string[] titles, Func<int> current, Action<int> pick)
     {
-        var b = Theme.Button(titles[current()] + "  ▾");
+        var b = Theme.Button(titles[current()], trailing: '\uE70D');
         b.Margin = new Padding(0, Theme.Dp(2), Theme.Dp(8), Theme.Dp(2));
         var menu = Theme.Menu();
         for (int i = 0; i < titles.Length; i++)
         {
             int k = i;
-            menu.Items.Add(new ToolStripMenuItem(titles[i], null, (_, _) => { b.Text = titles[k] + "  ▾"; pick(k); }) { Padding = new Padding(0, Theme.Dp(5), Theme.Dp(8), Theme.Dp(5)) });
+            menu.Items.Add(new ToolStripMenuItem(titles[i], null, (_, _) => { b.Text = titles[k]; pick(k); }) { Padding = new Padding(0, Theme.Dp(5), Theme.Dp(8), Theme.Dp(5)) });
         }
         menu.Opening += (_, _) => { for (int i = 0; i < titles.Length; i++) ((ToolStripMenuItem)menu.Items[i]).Font = Theme.UI(10f, i == current() ? FontStyle.Bold : FontStyle.Regular); };
         b.Click += (_, _) => menu.Show(b, new Point(0, b.Height));

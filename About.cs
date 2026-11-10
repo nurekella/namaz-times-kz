@@ -49,9 +49,9 @@ public class AboutForm : Form
 
         var news = Theme.Button(L.T("News"), primary: true);
         news.Click += (_, _) => openNews();
-        var report = Theme.Button(L.T("ReportProblem"));
+        var report = Theme.Button(L.T("ReportProblem"), glyph: '\uEBE8');
         report.Click += (_, _) => OpenUrl(RepoUrl + "/issues");
-        var github = Theme.Button("GitHub");
+        var github = Theme.Button("GitHub", glyph: '\uE8A7');
         github.Click += (_, _) => OpenUrl(RepoUrl);
         var buttons = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, Theme.Dp(12), 0, 0) };
         buttons.Controls.AddRange([news, report, github]);

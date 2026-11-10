@@ -440,7 +440,7 @@ public class Widget : Form
         using var name = F(11.5f, FontStyle.Bold);
         using var time = F(12f, FontStyle.Bold);
         using var clock = F(14f, FontStyle.Bold);
-        using var icons = new Font("Segoe MDL2 Assets", 10f * EZ / 100f);
+        using var icons = new Font(Theme.IconFamily, 10f * EZ / 100f);
         var now = Clock();
         const TextFormatFlags Right = TextFormatFlags.Right | TextFormatFlags.VerticalCenter;
         const TextFormatFlags Left = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
@@ -578,7 +578,7 @@ public class Widget : Form
         }
 
         // Settings, tasbih, 99 names and menu buttons: always visible in the top strip, so nobody has to guess the right-click.
-        using (var toolFont = new Font("Segoe MDL2 Assets", 9.5f * EZ / 100f))
+        using (var toolFont = new Font(Theme.IconFamily, 9.5f * EZ / 100f))
         {
             string[] toolGlyphs = ["", ""]; // Settings, More — everything else lives in the ⋯ menu so the strip never overflows
             for (int i = 0; i < tools.Length; i++)
@@ -600,7 +600,7 @@ public class Widget : Form
         var bh = full ? Theme.Dp(32) : Z(24);
         for (int i = 0; i < 3; i++) captions[i] = new RectangleF(ClientSize.Width - (3 - i) * bw, 0, bw, bh);
         if (!hover) return;
-        using var capFont = new Font("Segoe MDL2 Assets", full ? 8f : 7f * EZ / 100f);
+        using var capFont = new Font(Theme.IconFamily, full ? 8f : 7f * EZ / 100f);
         using (var bg = new SolidBrush(Sky1)) g.FillRectangle(bg, captions[0].X, 0, 3 * bw, bh);
         string[] glyphs = ["", full ? "" : "", ""]; // ChromeMinimize, ChromeRestore/Maximize, ChromeClose
         for (int i = 0; i < 3; i++)

@@ -50,7 +50,7 @@ public class MainWindow : Form
             DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = Theme.Dp(40), IntegralHeight = false, Font = Theme.UI(10f),
         };
         nav.Items.AddRange([.. pages.Select(p => (object)p.Key)]);
-        var glyphFont = new Font("Segoe MDL2 Assets", 11f * Theme.UiScale);
+        var glyphFont = new Font(Theme.IconFamily, 11f * Theme.UiScale);
         nav.DrawItem += (_, e) =>
         {
             if (e.Index < 0) return;

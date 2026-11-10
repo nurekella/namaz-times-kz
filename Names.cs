@@ -80,8 +80,8 @@ public class NamesForm : Form
 
         // ‹ › under the details: previous / next name (wraps around 1 ↔ 99); arrow keys do the same.
         step = d => Select(Name99.All.Value[(selected.N - 1 + d + 99) % 99]);
-        var prev = Theme.Button("‹ " + L.T("Prev"));
-        var next = Theme.Button(L.T("Next") + " ›", primary: true);
+        var prev = Theme.Button(L.T("Prev"), glyph: '\uE76B'); // ChevronLeft
+        var next = Theme.Button(L.T("Next"), primary: true, trailing: '\uE76C'); // ChevronRight
         prev.Click += (_, _) => step(-1);
         next.Click += (_, _) => step(1);
         var nav = new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Theme.Card, Padding = Padding.Empty };

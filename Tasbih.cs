@@ -84,7 +84,7 @@ public class TasbihForm : Form
 
         var target = new Segmented(Targets.Select(t => t switch { Recommended => L.T("TargetRecommended"), Custom => L.T("TargetCustom"), 0 => "∞", _ => t.ToString() }),
             Math.Max(0, Array.IndexOf(Targets, TargetOption)));
-        var reset = Theme.Button("↺");
+        var reset = Theme.Button("", glyph: '\uE72C'); // Refresh
         var targetRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.None, Margin = new Padding(0, Theme.Dp(4), 0, Theme.Dp(6)) };
         target.Margin = new Padding(0, 0, Theme.Dp(8), 0);
         // Own number: shown only while "Custom" is selected

@@ -33,11 +33,11 @@ public class QadaForm : Form
                 Font = Theme.UI(16f, FontStyle.Bold), ForeColor = Theme.Text, Margin = new Padding(0, 0, Theme.Dp(16), 0), Anchor = AnchorStyles.None,
             };
             counts[key] = count;
-            var madeUp = Theme.Button("✓ " + L.T("QadaMadeUp"), primary: true);
+            var madeUp = Theme.Button(L.T("QadaMadeUp"), primary: true, glyph: '\uE73E'); // CheckMark
             madeUp.Anchor = AnchorStyles.None;
             madeUp.Margin = new Padding(0, Theme.Dp(4), Theme.Dp(8), Theme.Dp(4));
             madeUp.Click += (_, _) => Change(key, -1);
-            var add = Theme.Button("+");
+            var add = Theme.Button("", glyph: '\uE710'); // Add
             add.Anchor = AnchorStyles.Left;
             add.Click += (_, _) => Change(key, +1);
             g.Controls.AddRange([name, count, madeUp, add]);
@@ -54,7 +54,7 @@ public class QadaForm : Form
         var amount = new NumericUpDown
         {
             Minimum = 1, Maximum = 36500, Value = 1, Width = Theme.Dp(90), Font = Theme.UI(11f),
-            BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.FixedSingle, Anchor = AnchorStyles.Left,
+            BackColor = Theme.Card, ForeColor = Theme.Text, BorderStyle = BorderStyle.None, Anchor = AnchorStyles.Left,
             Margin = new Padding(0, Theme.Dp(4), Theme.Dp(10), Theme.Dp(4)),
         };
         var unit = new Segmented([L.T("UnitDays"), L.T("UnitMonths"), L.T("UnitYears")], 0) { Margin = new Padding(0, 0, Theme.Dp(10), 0) };

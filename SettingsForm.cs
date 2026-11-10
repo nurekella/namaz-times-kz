@@ -34,12 +34,12 @@ public class SettingsForm : Form
         var lang = new Segmented(L.Languages.Select(l => l.Name), Array.FindIndex(L.Languages, l => l.Code == s.Lang));
         lang.Changed += i => Set(() => s.Lang = L.Languages[i].Code, rebuild: true);
         Card('', L.T("Language"), null, lang);
-        var cityBtn = Theme.Button(s.City.Title + "  ›");
+        var cityBtn = Theme.Button(s.City.Title, trailing: '\uE76C');
         cityBtn.Click += (_, _) =>
         {
             using var f = new CityPicker();
             if (f.ShowDialog(this) != DialogResult.OK || f.Selected == null) return;
-            cityBtn.Text = f.Selected.Title + "  ›";
+            cityBtn.Text = f.Selected.Title;
             Set(() => s.City = f.Selected);
         };
         Card('', L.T("City"), null, cityBtn);
@@ -120,11 +120,11 @@ public class SettingsForm : Form
 
         // About this app: version, updates, backup
         Header(L.T("About"));
-        var check = Theme.Button("↻ " + L.T("CheckUpdates"));
+        var check = Theme.Button(L.T("CheckUpdates"), glyph: '\uE72C');
         check.Click += async (_, _) => { check.Enabled = false; try { await (checkUpdates?.Invoke(this) ?? Task.CompletedTask); } finally { check.Enabled = true; } };
         Card('', $"Namaz Times KZ {Updates.Current.ToString(3)}", "muftyat.kz", check);
-        var export = Theme.Button("⭳ " + L.T("Export"));
-        var import = Theme.Button("⭱ " + L.T("Import"));
+        var export = Theme.Button(L.T("Export"), glyph: '\uE896');
+        var import = Theme.Button(L.T("Import"), glyph: '\uE898');
         export.Click += (_, _) =>
         {
             using var d = new SaveFileDialog { FileName = "NamazTimes-settings.json", Filter = "JSON|*.json" };
@@ -208,7 +208,7 @@ public class SettingsForm : Form
         card.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         var icon = new Label
         {
-            Text = glyph.ToString(), Font = new Font("Segoe MDL2 Assets", 13f * Theme.UiScale), ForeColor = Theme.Text, AutoSize = true,
+            Text = glyph.ToString(), Font = new Font(Theme.IconFamily, 13f * Theme.UiScale), ForeColor = Theme.Text, AutoSize = true,
             Anchor = AnchorStyles.Left, Margin = new Padding(0, 0, Theme.Dp(16), 0),
         };
         var texts = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Anchor = AnchorStyles.Left, Margin = Padding.Empty };
