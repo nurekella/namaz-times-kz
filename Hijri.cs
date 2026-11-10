@@ -16,6 +16,18 @@ public static class Hijri
     public static DateOnly ToGregorian(int y, int m, int d, int adjust) =>
         DateOnly.FromDateTime(Cal.ToDateTime(y, m, d, 0, 0, 0, 0)).AddDays(-adjust);
 
+    /// Monday of the week that contains <paramref name="date"/>.
+    public static DateOnly WeekStart(DateOnly date) => date.AddDays(-(((int)date.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7));
+
+    /// The Ramadan that contains <paramref name="date"/>, or the next one when that date is already past it.
+    /// End is 1 Shawwal: the fast is over that morning.
+    public static (int Y, DateOnly Start, DateOnly End) RamadanAround(DateOnly date, int adj)
+    {
+        var (y, m, _) = Of(date, adj);
+        if (m > 9) y++;
+        return (y, ToGregorian(y, 9, 1, adj), ToGregorian(y, 10, 1, adj));
+    }
+
     public static string Format(DateOnly date, int adjust)
     {
         var (y, m, d) = Of(date, adjust);

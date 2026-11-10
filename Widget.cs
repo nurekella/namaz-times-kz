@@ -101,6 +101,7 @@ public class Widget : Form
         L.Lang = s.Lang;
         L.Hour12 = s.Hour12;
         Theme.UiScale = Math.Clamp(s.UiScale, 80, 160) / 100f;
+        Theme.AccentChoice = Math.Clamp(s.Accent, 0, 2);
         Theme.SetMode(s.ThemeMode); // windows opened from now on, and the widget itself
         BackColor = Theme.Bg;
         showItem.Text = L.T("ShowWidget");
@@ -235,6 +236,15 @@ public class Widget : Form
     {
         if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
         SetWidgetVisible(true);
+        OpenHome();
+    }
+
+    /// The main window, on Today. Called at startup and when a second launch asks this copy to come forward.
+    /// It is a normal window: the widget may stay above other programs, this one should not.
+    internal void OpenHome()
+    {
+        Page("today");
+        if (main is { IsDisposed: false }) main.TopMost = false;
     }
 
     void SetWidgetVisible(bool v)

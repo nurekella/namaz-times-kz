@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace NamazTimes;
 
 /// The app's look, after Wintor: Windows 11 structure (Fluent controls, 4 px controls, 8 px cards) on Tailwind "zinc"
-/// neutrals instead of Fluent's translucent greys, with the user's Windows accent colour. Dark or light (SetMode).
+/// neutrals instead of Fluent's translucent greys, with the chosen accent colour. Dark or light (SetMode).
 public static class Theme
 {
     /// Chrome = title bar and navigation pane; Bg = the content layer the pages lie on; Card = cards and tables.
@@ -14,6 +14,8 @@ public static class Theme
     public static Color CardStroke, Flyout, NavSelected, Track; // card border, menu background, chosen nav item, empty progress
     public static Color Blue, Green, Neutral; // progress: in progress, done, segmented track
     public static bool IsDark = true;
+    /// 0 = the Windows accent, 1 = green, 2 = purple. Read by SetMode.
+    public static int AccentChoice;
     public static readonly Color NightBg = Color.FromArgb(24, 24, 27), NightAccent = Color.FromArgb(34, 197, 94);
 
     static Theme() => SetMode(1);
@@ -28,7 +30,7 @@ public static class Theme
     public static void SetMode(int mode)
     {
         IsDark = mode switch { 1 => true, 2 => false, _ => SystemDark() };
-        var (light, dark) = SystemAccent();
+        var (light, dark) = ChosenAccent();
         if (IsDark)
         {
             (Chrome, Bg, Card, Line) = (Z950, Z900, Z800, Hex(0x343437));
@@ -52,6 +54,14 @@ public static class Theme
             (Blue, Green, Neutral) = (Hex(0x2563EB), Hex(0x16A34A), Z100);
         }
     }
+
+    /// Light shade for dark mode, dark shade for light mode — the same split WinUI uses for the Windows accent.
+    static (Color Light, Color Dark) ChosenAccent() => AccentChoice switch
+    {
+        1 => (Hex(0x4ADE80), Hex(0x15803D)), // green-400 / green-700
+        2 => (Hex(0xA78BFA), Hex(0x6D28D9)), // violet-400 / violet-700
+        _ => SystemAccent(),
+    };
 
     /// The Windows accent colour in its light (for dark mode) and dark (for light mode) shades, as WinUI uses them.
     static (Color Light, Color Dark) SystemAccent()

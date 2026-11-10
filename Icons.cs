@@ -25,7 +25,7 @@ public static class Icons
         [''] = "ArrowLeft01", [''] = "ArrowRight01", [''] = "Add01", [''] = "MoreHorizontal",
         [''] = "Pin", [''] = "Search01", [''] = "Refresh", [''] = "Tick02", [''] = "Maximize01",
         [''] = "VolumeHigh", [''] = "VolumeMute02", [''] = "VolumeHigh", [''] = "Translate",
-        [''] = "SunMoon", [''] = "Droplet", [''] = "Power", [''] = "NotificationOff01",
+        [''] = "SunMoon", [''] = "Sun03", [''] = "Droplet", [''] = "Power", [''] = "NotificationOff01",
         [''] = "Notification01", [''] = "AppWindow", [''] = "ArrowReloadHorizontal",
         [''] = "Download01", [''] = "Upload01", [''] = "LinkSquare02", [''] = "Archive02",
         [''] = "Bug01", [''] = "Menu01", [''] = "Cancel01", [''] = "Bookmark02",
