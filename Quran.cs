@@ -136,7 +136,7 @@ public class QuranForm : Form
         var legend = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Padding = new Padding(0, 0, 0, Theme.Dp(8)) };
         foreach (var (color, key) in QuranText.Tajweed)
         {
-            var chip = Theme.Round(new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Theme.Card, Margin = new Padding(0, 0, Theme.Dp(5), Theme.Dp(5)), Padding = new Padding(Theme.Dp(4), Theme.Dp(1), Theme.Dp(6), Theme.Dp(1)) }, 8);
+            var chip = Theme.Round(new FlowLayoutPanel { AutoSize = true, WrapContents = false, BackColor = Theme.Card, Margin = new Padding(0, 0, Theme.Dp(5), Theme.Dp(5)), Padding = new Padding(Theme.Dp(4), Theme.Dp(1), Theme.Dp(6), Theme.Dp(1)) }, Theme.ControlRadius);
             var dot = Theme.Label("●", color, 10f);
             dot.Margin = new Padding(0, Theme.Dp(3), Theme.Dp(4), Theme.Dp(3));
             var name = Theme.Label(L.T(key), Theme.Text, 8.5f);
@@ -155,7 +155,7 @@ public class QuranForm : Form
         };
         list.DrawItem += DrawSura;
         list.HandleCreated += (_, _) => Theme.DarkScrollbars(list);
-        Theme.Round(list, 10);
+        Theme.Round(list);
         var left = new Panel { Dock = DockStyle.Left, Width = Theme.Dp(290), Padding = new Padding(0, 0, Theme.Dp(12), 0) };
         left.Controls.AddRange([list, new Panel { Dock = DockStyle.Top, Height = Theme.Dp(8) }, searchBox]);
 
@@ -175,7 +175,7 @@ public class QuranForm : Form
         var bottom = new FlowLayoutPanel { Dock = DockStyle.Bottom, AutoSize = true, WrapContents = true, Padding = new Padding(0, Theme.Dp(6), 0, 0) };
         bottom.Controls.AddRange([bookmark, sources]);
 
-        view = Theme.Round(new VerseView(s) { Dock = DockStyle.Fill }, 10);
+        view = Theme.Round(new VerseView(s) { Dock = DockStyle.Fill });
         view.Bookmarked += UpdateBookmark;
         Controls.AddRange([view, left, legend, bar, bottom]);
 
@@ -254,14 +254,11 @@ public class QuranForm : Form
         var sura = QuranText.Suras.Value[n - 1];
         var selected = (e.State & DrawItemState.Selected) != 0;
         var b = e.Bounds;
-        using (var bg = new SolidBrush(Theme.Card)) g.FillRectangle(bg, b);
+        Theme.ListItem(g, b, selected);
         g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-        if (selected)
-            using (var path = Theme.RoundRect(new RectangleF(b.X + Theme.Dp(4), b.Y + Theme.Dp(3), b.Width - Theme.Dp(8), b.Height - Theme.Dp(6)), Theme.Dp(8)))
-            using (var sel = new SolidBrush(Theme.Line)) g.FillPath(sel, path);
         int sq = Theme.Dp(30), x = b.X + Theme.Dp(12);
         var box = new Rectangle(x, b.Y + (b.Height - sq) / 2, sq, sq);
-        using (var path = Theme.RoundRect(box, Theme.Dp(7)))
+        using (var path = Theme.RoundRect(box, Theme.Dp(Theme.ControlRadius)))
         using (var pen = new Pen(n == s.QuranSura ? Theme.Gold : selected ? Theme.Accent : Theme.Line, Theme.Dp(1))) g.DrawPath(pen, path);
         TextRenderer.DrawText(g, n.ToString(), suraSub, box, n == s.QuranSura ? Theme.Gold : selected ? Theme.Accent : Theme.Muted,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
@@ -537,7 +534,7 @@ public class QuranForm : Form
             var sura = QuranText.Suras.Value[Sura - 1];
 
             // Header: name, Arabic name, Meccan/Medinan · verses
-            TextRenderer.DrawText(g, $"{Sura} · {sura.Name}", titleFont, new Rectangle(0, dy + Theme.Dp(12), w, Theme.Dp(30)), Theme.Accent, TextFormatFlags.HorizontalCenter);
+            TextRenderer.DrawText(g, $"{Sura} · {sura.Name}", titleFont, new Rectangle(0, dy + Theme.Dp(12), w, Theme.Dp(30)), Theme.Text, TextFormatFlags.HorizontalCenter);
             TextRenderer.DrawText(g, $"{L.T(sura.Mecca ? "Meccan" : "Medinan")} · {string.Format(L.T("Ayahs"), sura.N)}   ·   {L.T("QuranBookmarkHint")}", subFont,
                 new Rectangle(0, dy + Theme.Dp(44), w, Theme.Dp(22)), Theme.Muted, TextFormatFlags.HorizontalCenter);
 
@@ -552,7 +549,12 @@ public class QuranForm : Form
                 if (top + heights[i] < e.ClipRectangle.Top) continue;
                 if (top > e.ClipRectangle.Bottom) break;
                 var marked = s.QuranSura == Sura && s.QuranAya == i + 1;
-                if (marked) using (var b = new SolidBrush(Marked)) g.FillRectangle(b, 0, top, w, heights[i]);
+                if (marked)
+                {
+                    using (var b = new SolidBrush(Marked)) g.FillRectangle(b, 0, top, w, heights[i]);
+                    using var bar = new SolidBrush(Theme.Gold);
+                    g.FillRectangle(bar, 0, top + Theme.Dp(10), Theme.Dp(3), heights[i] - Theme.Dp(20));
+                }
                 g.DrawLine(line, Pad, top, w - Pad, top);
 
                 // verse number in an eight-point star, like the ayah marks of a mushaf (gold when bookmarked)

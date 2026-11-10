@@ -34,13 +34,13 @@ public class PrayerTypesForm : Form
         {
             if (e.Index < 0) return;
             var selected = (e.State & DrawItemState.Selected) != 0;
-            using (var bg = new SolidBrush(selected ? Theme.Line : Theme.Card)) e.Graphics.FillRectangle(bg, e.Bounds);
-            if (selected) using (var bar = new SolidBrush(Theme.Accent)) e.Graphics.FillRectangle(bar, e.Bounds.X, e.Bounds.Y + Theme.Dp(8), Theme.Dp(3), e.Bounds.Height - Theme.Dp(16));
+            Theme.ListItem(e.Graphics, e.Bounds, selected);
             TextRenderer.DrawText(e.Graphics, list.Items[e.Index].ToString(), list.Font,
                 new Rectangle(e.Bounds.X + Theme.Dp(14), e.Bounds.Y, e.Bounds.Width - Theme.Dp(18), e.Bounds.Height),
                 selected ? Theme.Text : Theme.Muted, TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         };
         list.HandleCreated += (_, _) => Theme.DarkScrollbars(list);
+        Theme.Round(list);
 
         body = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Dock = DockStyle.Top, Padding = new Padding(Theme.Dp(8), 0, Theme.Dp(8), Theme.Dp(12)) };
         scroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Theme.Bg };

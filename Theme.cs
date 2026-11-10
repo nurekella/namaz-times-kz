@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 
 namespace NamazTimes;
 
-/// Palette shared by all windows (dark or light, see SetMode), plus a few small owner-drawn controls.
-/// The desktop widget keeps its own night palette (Night*).
+/// Fluent 2 (Windows 11) look for all windows: palette (dark or light, see SetMode), 4 px controls, 8 px cards,
+/// and a few small owner-drawn controls. The desktop widget keeps its own night palette (Night*).
 public static class Theme
 {
     public static Color Bg, Card, Line, Text, Muted, Accent, OnAccent, Gold, Faded, Marked;
@@ -19,15 +19,16 @@ public static class Theme
         IsDark = mode switch { 1 => true, 2 => false, _ => SystemDark() };
         if (IsDark)
         {
-            (Bg, Card, Line) = (NightBg, Color.FromArgb(33, 38, 46), NightLine);
-            (Text, Muted, Accent, OnAccent) = (Color.FromArgb(235, 238, 242), Color.FromArgb(150, 160, 175), NightAccent, NightBg);
-            (Gold, Faded, Marked) = (Color.FromArgb(230, 190, 110), Color.FromArgb(96, 105, 120), Color.FromArgb(38, 48, 42));
+            // Mica base, card layer, subtle stroke / hover fill
+            (Bg, Card, Line) = (Color.FromArgb(32, 32, 32), Color.FromArgb(43, 43, 43), Color.FromArgb(58, 58, 58));
+            (Text, Muted, Accent, OnAccent) = (Color.White, Color.FromArgb(170, 170, 170), Color.FromArgb(108, 203, 143), Color.FromArgb(10, 30, 18));
+            (Gold, Faded, Marked) = (Color.FromArgb(230, 190, 110), Color.FromArgb(110, 110, 110), Color.FromArgb(47, 56, 50));
         }
         else
         {
-            (Bg, Card, Line) = (Color.FromArgb(243, 244, 246), Color.White, Color.FromArgb(222, 226, 231));
-            (Text, Muted, Accent, OnAccent) = (Color.FromArgb(28, 32, 38), Color.FromArgb(100, 108, 120), Color.FromArgb(26, 140, 88), Color.White);
-            (Gold, Faded, Marked) = (Color.FromArgb(166, 112, 14), Color.FromArgb(170, 176, 186), Color.FromArgb(232, 245, 236));
+            (Bg, Card, Line) = (Color.FromArgb(243, 243, 243), Color.FromArgb(251, 251, 251), Color.FromArgb(229, 229, 229));
+            (Text, Muted, Accent, OnAccent) = (Color.FromArgb(27, 27, 27), Color.FromArgb(97, 97, 97), Color.FromArgb(15, 123, 70), Color.White);
+            (Gold, Faded, Marked) = (Color.FromArgb(154, 103, 0), Color.FromArgb(168, 168, 168), Color.FromArgb(232, 243, 236));
         }
     }
 
@@ -107,7 +108,9 @@ public static class Theme
     }
 
     /// Rounds a panel's corners (clipping region, kept in step with its size).
-    public static T Round<T>(T c, int radius = 10) where T : Control
+    public const int CardRadius = 8, ControlRadius = 4; // Fluent 2
+
+    public static T Round<T>(T c, int radius = CardRadius) where T : Control
     {
         void Clip()
         {
@@ -158,10 +161,23 @@ public static class Theme
             Padding = new Padding(Dp(14), Dp(10), Dp(14), Dp(10)), Margin = new Padding(0, 0, 0, Dp(12)),
         };
         Round(outer);
-        outer.Controls.Add(Label(title, Accent, 10.5f, FontStyle.Bold));
+        outer.Controls.Add(Label(title, Text, 11f, FontStyle.Bold)); // Fluent: headings in text colour, accent is for actions
         grid = new TableLayoutPanel { AutoSize = true, ColumnCount = columns, Dock = DockStyle.Fill, Margin = Padding.Empty };
         outer.Controls.Add(grid);
         return outer;
+    }
+
+    /// Fluent list row: selection is a soft rounded fill with a short accent pill on the left.
+    public static void ListItem(Graphics g, Rectangle b, bool selected)
+    {
+        using (var bg = new SolidBrush(Card)) g.FillRectangle(bg, b);
+        if (!selected) return;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        using (var path = RoundRect(new RectangleF(b.X + Dp(4), b.Y + Dp(2), b.Width - Dp(8), b.Height - Dp(4)), Dp(ControlRadius)))
+        using (var fill = new SolidBrush(Line)) g.FillPath(fill, path);
+        int h = Math.Min(Dp(16), b.Height - Dp(12));
+        using (var pill = RoundRect(new RectangleF(b.X + Dp(4), b.Y + (b.Height - h) / 2f, Dp(3), h), Dp(1)))
+        using (var accent = new SolidBrush(Accent)) g.FillPath(accent, pill);
     }
 
     public static GraphicsPath RoundRect(RectangleF r, float rad)
@@ -231,7 +247,7 @@ public static class Theme
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             if (e.Item.Selected && e.Item.Enabled)
             {
-                using var path = RoundRect(new RectangleF(Dp(2), 1, e.Item.Width - Dp(4), e.Item.Height - 2), Dp(5));
+                using var path = RoundRect(new RectangleF(Dp(2), 1, e.Item.Width - Dp(4), e.Item.Height - 2), Dp(ControlRadius));
                 using var b = new SolidBrush(Line);
                 e.Graphics.FillPath(b, path);
             }
@@ -301,9 +317,15 @@ public class RoundButton : Button
         var primary = BackColor == Theme.Accent;
         var fill = !Enabled ? Theme.Card : hot ? (primary ? ControlPaint.Light(BackColor, 0.25f) : Theme.Line) : BackColor;
         var r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
-        using var path = Theme.RoundRect(r, Theme.Dp(7));
+        using var path = Theme.RoundRect(r, Theme.Dp(Theme.ControlRadius));
         using (var b = new SolidBrush(fill)) g.FillPath(b, path);
-        if (!primary) using (var p = new Pen(Theme.Line)) g.DrawPath(p, path);
+        if (!primary)
+        {
+            using (var p = new Pen(Theme.Line)) g.DrawPath(p, path);
+            // Fluent "elevation" stroke: the bottom edge is a touch stronger
+            using var bottom = new Pen(Theme.IsDark ? Theme.Line : ControlPaint.Dark(Theme.Line, 0.05f));
+            g.DrawLine(bottom, Theme.Dp(Theme.ControlRadius), Height - 1, Width - Theme.Dp(Theme.ControlRadius), Height - 1);
+        }
         TextRenderer.DrawText(g, Text, Font, ClientRectangle, Enabled ? ForeColor : Theme.Muted,
             TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine);
     }
@@ -337,16 +359,20 @@ public class SearchBox : Panel
         var g = e.Graphics;
         g.Clear(Parent?.BackColor ?? Theme.Bg);
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        using var path = Theme.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), Theme.Dp(8));
+        using var path = Theme.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), Theme.Dp(Theme.ControlRadius));
         using (var b = new SolidBrush(Theme.Card)) g.FillPath(b, path);
-        using (var p = new Pen(Box.Focused ? Theme.Accent : Theme.Line)) g.DrawPath(p, path);
+        using (var p = new Pen(Theme.Line)) g.DrawPath(p, path);
+        // underline: grey at rest, 2 px accent while typing
+        var focused = Box.Focused;
+        using (var u = new Pen(focused ? Theme.Accent : Theme.Muted, focused ? Theme.Dp(2) : 1))
+            g.DrawLine(u, Theme.Dp(Theme.ControlRadius), Height - (focused ? Theme.Dp(1) : 1), Width - Theme.Dp(Theme.ControlRadius), Height - (focused ? Theme.Dp(1) : 1));
         using var icon = new Font("Segoe MDL2 Assets", 10f * Theme.UiScale);
         TextRenderer.DrawText(g, "", icon, new Rectangle(Theme.Dp(10), 0, Theme.Dp(20), Height), Theme.Muted,
             TextFormatFlags.VerticalCenter | TextFormatFlags.HorizontalCenter);
     }
 }
 
-/// iOS-style on/off switch.
+/// Fluent toggle switch: outlined track with a grey knob when off, accent track when on.
 public class Toggle : Control
 {
     bool on;
@@ -355,7 +381,7 @@ public class Toggle : Control
     public Toggle(bool value = false)
     {
         on = value;
-        Size = new Size(Theme.Dp(40), Theme.Dp(22));
+        Size = new Size(Theme.Dp(40), Theme.Dp(20));
         Margin = new Padding(0, Theme.Dp(4), Theme.Dp(4), Theme.Dp(4));
         Anchor = AnchorStyles.None;
         Cursor = Cursors.Hand;
@@ -378,12 +404,12 @@ public class Toggle : Control
         g.SmoothingMode = SmoothingMode.AntiAlias;
         var r = new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f);
         using var track = Theme.RoundRect(r, r.Height / 2);
-        using var fill = new SolidBrush(on ? Theme.Accent : Theme.Line);
-        g.FillPath(fill, track);
-        var d = r.Height - Theme.Dp(6);
-        var x = on ? r.Right - d - Theme.Dp(3) : r.X + Theme.Dp(3);
+        if (on) using (var fill = new SolidBrush(Theme.Accent)) g.FillPath(fill, track);
+        else using (var stroke = new Pen(Theme.Muted)) g.DrawPath(stroke, track);
+        var d = r.Height - Theme.Dp(8);
+        var x = on ? r.Right - d - Theme.Dp(4) : r.X + Theme.Dp(4);
         using var knob = new SolidBrush(on ? Theme.OnAccent : Theme.Muted);
-        g.FillEllipse(knob, x, r.Y + Theme.Dp(3), d, d);
+        g.FillEllipse(knob, x, r.Y + Theme.Dp(4), d, d);
     }
 }
 
@@ -457,7 +483,7 @@ public class Segmented : FlowLayoutPanel
             Controls.Add(rb);
         }
         items[Math.Clamp(selected, 0, items.Count - 1)].Checked = true;
-        Theme.Round(this, 9);
+        Theme.Round(this, 6);
     }
 
     public int Selected
@@ -479,7 +505,7 @@ public class Segmented : FlowLayoutPanel
             g.SmoothingMode = SmoothingMode.AntiAlias;
             if (Checked || hot)
             {
-                using var pill = Theme.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), Theme.Dp(6));
+                using var pill = Theme.RoundRect(new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), Theme.Dp(Theme.ControlRadius));
                 using var b = new SolidBrush(Checked ? Theme.Accent : Theme.Line);
                 g.FillPath(b, pill);
             }

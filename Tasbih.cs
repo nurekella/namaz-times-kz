@@ -54,8 +54,7 @@ public class TasbihForm : Form
         {
             if (e.Index < 0) return;
             var selected = (e.State & DrawItemState.Selected) != 0;
-            using (var bg = new SolidBrush(selected ? Theme.Line : Theme.Card)) e.Graphics.FillRectangle(bg, e.Bounds);
-            if (selected) using (var bar = new SolidBrush(Theme.Accent)) e.Graphics.FillRectangle(bar, e.Bounds.X, e.Bounds.Y + Theme.Dp(8), Theme.Dp(3), e.Bounds.Height - Theme.Dp(16));
+            Theme.ListItem(e.Graphics, e.Bounds, selected);
             var count = s.TasbihCounts[e.Index];
             var countW = count > 0 ? Theme.Dp(48) : 0;
             TextRenderer.DrawText(e.Graphics, Dhikr.All.Value[e.Index].Translit, list.Font,
@@ -66,7 +65,7 @@ public class TasbihForm : Form
                     Theme.Accent, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
         };
         list.HandleCreated += (_, _) => Theme.DarkScrollbars(list);
-        Theme.Round(list, 10);
+        Theme.Round(list);
 
         // Right: the selected dhikr and the counter (fixed heights so the window doesn't jump between dhikrs)
         int w = Theme.Dp(400);
@@ -228,7 +227,7 @@ public class TasbihForm : Form
             g.Clear(Theme.Bg);
             float th = Theme.Dp(12), pad = th / 2 + 2;
             var r = new RectangleF(pad, pad, Width - 2 * pad, Height - 2 * pad);
-            using (var track = new Pen(Theme.Card, th)) g.DrawEllipse(track, r);
+            using (var track = new Pen(Theme.Line, th)) g.DrawEllipse(track, r);
             if (sweep > 0.5f)
                 using (var arc = new Pen(Theme.Accent, th) { StartCap = LineCap.Round, EndCap = LineCap.Round })
                     g.DrawArc(arc, r, -90, Math.Max(sweep, 1));

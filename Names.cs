@@ -154,7 +154,7 @@ public class NamesForm : Form
             g.Clear(Theme.Bg);
             var n = owner.selected;
             var r = new RectangleF(0.5f, Theme.Dp(6), Width - 1.5f, Height - Theme.Dp(6) - 1);
-            using var path = Theme.RoundRect(r, Theme.Dp(10));
+            using var path = Theme.RoundRect(r, Theme.Dp(Theme.CardRadius));
             using (var b = new SolidBrush(Theme.Card)) g.FillPath(b, path);
             using (var p = new Pen(Color.FromArgb(110, Gold), Theme.Dp(1))) g.DrawPath(p, path);
             using var ar = new Font(Name99.ArabicFont, 30f * Theme.UiScale);
