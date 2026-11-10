@@ -70,6 +70,7 @@ public class Settings
     public bool QuranTajweed { get; set; } = true;
     public bool QuranLegend { get; set; } // tajweed colour legend expanded
     public int ThemeMode { get; set; } = 1; // 0 = like Windows, 1 = dark, 2 = light
+    public int Accent { get; set; } // 0 = Windows accent, 1 = green, 2 = purple
     public bool QuranMeaning { get; set; } = true;
     public int QuranSize { get; set; } = 22; // Arabic font size, pt
     public int QuranSura { get; set; } = 1; // bookmark
@@ -254,6 +255,7 @@ static class Program
         ApplicationConfiguration.Initialize();
         var widget = new Widget(Data.LoadSettings());
         _ = widget.Handle; // needed for BeginInvoke even while the widget starts hidden
+        widget.BeginInvoke(widget.OpenHome); // the main window opens with the app; the widget stays for the desktop
         new Thread(() => { while (showSignal.WaitOne()) widget.BeginInvoke(widget.BringBack); }) { IsBackground = true }.Start();
         if (args.Contains("--update")) // check GitHub now and install a newer version if there is one
             widget.BeginInvoke(async () => await widget.UpdateNow());
@@ -296,6 +298,15 @@ static class Program
         Trace.Assert(Hijri.SunnahFast(Hijri.ToGregorian(1447, 12, 9, 0), 0) == "FastArafa");
         Trace.Assert(Hijri.SunnahFast(Hijri.ToGregorian(1447, 12, 10, 0), 0) == null, "Eid al-Adha");
         Trace.Assert(Hijri.SunnahFast(Hijri.ToGregorian(1447, 9, 5, 0), 0) == null, "Ramadan is obligatory, not sunnah");
+        var week = new DateOnly(2026, 11, 9); // Monday
+        Trace.Assert(Hijri.WeekStart(week) == week && Hijri.WeekStart(week.AddDays(6)) == week, "a week starts on Monday");
+        var fitr = new DateOnly(2026, 3, 20); // 1 Shawwal 1447
+        var ramadan = Hijri.RamadanAround(fitr.AddDays(-1), 0);
+        Trace.Assert(ramadan.Y == 1447 && ramadan.End == fitr && Hijri.Of(ramadan.Start, 0) == (1447, 9, 1), $"ramadan {ramadan}");
+        Trace.Assert(ramadan.End.DayNumber - ramadan.Start.DayNumber is 29 or 30, "ramadan length");
+        Trace.Assert(Hijri.RamadanAround(ramadan.Start, 0).Start == ramadan.Start, "inside Ramadan");
+        Trace.Assert(Hijri.RamadanAround(fitr, 0).Y == 1448, "after Ramadan comes the next one");
+        Trace.Assert(new Settings().Accent == 0, "accent follows Windows unless chosen");
         Trace.Assert(Hijri.SunnahFast(Hijri.ToGregorian(1448, 4, 14, 0), 0) == "FastWhiteDays");
         var monday = Enumerable.Range(0, 7).Select(i => Hijri.ToGregorian(1448, 4, 20, 0).AddDays(i)).First(x => x.DayOfWeek == DayOfWeek.Monday);
         Trace.Assert(Hijri.SunnahFast(monday, 0) == "FastMonday");

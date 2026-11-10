@@ -64,6 +64,9 @@ public class SettingsForm : Form
         var themeMode = new Dropdown([L.T("ThemeSystem"), L.T("ThemeDark"), L.T("ThemeLight")], s.ThemeMode);
         themeMode.Changed += i => Set(() => s.ThemeMode = i, rebuild: true);
         Card('', L.T("ThemeMode"), null, themeMode);
+        var accent = new Dropdown([L.T("AccentSystem"), L.T("AccentGreen"), L.T("AccentPurple")], Math.Clamp(s.Accent, 0, 2));
+        accent.Changed += i => Set(() => s.Accent = i, rebuild: true);
+        Card('', L.T("AccentColor"), null, accent);
         var uiScale = new Stepper(s.UiScale, 80, 160, 10, v => v + "%");
         uiScale.ValueChanged += v => Set(() => s.UiScale = v, rebuild: true);
         Card('', L.T("WindowScale"), null, uiScale);
