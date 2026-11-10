@@ -109,12 +109,25 @@ public class MainWindow : Form
             form = (make ?? page.Make)();
             made[key] = form;
             // Embed: a form can live inside another as a plain child control.
+            var compact = form.AutoSize && form.Controls.Count == 1; // a fixed-size layout (tasbih, zakat, qada, about)
             form.Opacity = 1;
             form.TopLevel = false;
             form.FormBorderStyle = FormBorderStyle.None;
             form.AutoSize = false;
             form.MinimumSize = Size.Empty;
             form.Dock = DockStyle.Fill;
+            if (compact)
+            {
+                // Keep it in the middle of the page instead of the top-left corner; scroll if the window is smaller.
+                var root = form.Controls[0];
+                form.AutoScroll = true;
+                if (form.IsHandleCreated) Theme.DarkScrollbars(form); else form.HandleCreated += (_, _) => Theme.DarkScrollbars(form);
+                void Center() => root.Location = new Point(Math.Max(0, (form.ClientSize.Width - root.Width) / 2),
+                    Math.Max(0, (form.ClientSize.Height - root.Height) / 2) + form.AutoScrollPosition.Y);
+                form.Resize += (_, _) => Center();
+                root.SizeChanged += (_, _) => Center();
+                Center();
+            }
             form.FormClosed += (_, _) => made.Remove(key);
             host.Controls.Add(form);
         }
