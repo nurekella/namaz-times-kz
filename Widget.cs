@@ -24,17 +24,7 @@ public class Widget : Form
     bool hotCity;
     Action? balloonAction;     // what clicking the last notification does (install update, open adhkar...)
     SettingsForm? settingsForm;
-    MonthForm? monthForm;
-    HolidaysForm? holidaysForm;
-    TasbihForm? tasbihForm;
-    NamesForm? namesForm;
-    PrayerTypesForm? typesForm;
-    QadaForm? qadaForm;
-    AdhkarForm? adhkarForm;
-    ZakatForm? zakatForm;
-    QuranForm? quranForm;
-    AboutForm? aboutForm;
-    NewsForm? newsForm;
+    MainWindow? main; // every section lives in one window, like Windows Settings
     RectangleF nameCard; // "name of the day" card, clickable
     bool full, hover;          // fullscreen mode; mouse over widget (shows window buttons)
     int hot = -1, fullZoom = 100;
@@ -55,15 +45,15 @@ public class Widget : Form
         KeyPreview = true;
         StartPosition = FormStartPosition.Manual;
         DoubleBuffered = true;
-        BackColor = Theme.NightBg;
+        BackColor = Theme.Bg;
         Text = "Namaz Times KZ";
         Icon = Theme.AppIcon();
 
         var menu = Theme.Menu();
         // Glyphs (Segoe MDL2): View, Calendar, FavoriteStar, RingerSilent, Settings, Download, PowerButton
         showItem = Theme.MenuItem('', (_, _) => SetWidgetVisible(!Visible));
-        monthItem = Theme.MenuItem('', (_, _) => Open(ref monthForm, () => new MonthForm(s)));
-        holidaysItem = Theme.MenuItem('', (_, _) => Open(ref holidaysForm, () => new HolidaysForm(s)));
+        monthItem = Theme.MenuItem('', (_, _) => Page("month"));
+        holidaysItem = Theme.MenuItem('', (_, _) => Page("holidays"));
         quranItem = Theme.MenuItem('', (_, _) => OpenQuran()); // Library
         tasbihItem = Theme.MenuItem('', (_, _) => OpenTasbih()); // RadioBullet, a bead
         adhkarItem = Theme.MenuItem('', (_, _) => OpenAdhkar()); // Brightness (sun)
@@ -76,7 +66,7 @@ public class Widget : Form
         checkUpdateItem = Theme.MenuItem('', (_, _) => _ = CheckUpdatesNow()); // Sync
         updateItem = Theme.MenuItem('', (_, _) => _ = InstallUpdate());
         updateItem.Visible = false;
-        aboutItem = Theme.MenuItem('', (_, _) => Open(ref aboutForm, () => new AboutForm(OpenNews))); // Info
+        aboutItem = Theme.MenuItem('', (_, _) => Page("about")); // Info
         newsItem = Theme.MenuItem('', (_, _) => OpenNews()); // QuickNote
         exitItem = Theme.MenuItem('', (_, _) => { tray!.Visible = false; Application.Exit(); });
         menu.Items.AddRange([showItem, monthItem, holidaysItem, quranItem, tasbihItem, adhkarItem, namesItem, typesItem, qadaItem, zakatItem, new ToolStripSeparator(), muteItem, settingsItem, checkUpdateItem, updateItem, newsItem, aboutItem,
@@ -103,14 +93,17 @@ public class Widget : Form
     int EZ => full ? fullZoom : s.Zoom;
     float Z(float v) => v * DeviceDpi / 96f * EZ / 100f;
     int Zi(float v) => (int)Math.Round(Z(v));
-    Font F(float pt, FontStyle st = FontStyle.Regular) => new(st == FontStyle.Bold ? "Segoe UI Semibold" : "Segoe UI", pt * EZ / 100f);
+    Font F(float pt, FontStyle st = FontStyle.Regular) => Theme.Variable
+        ? new(st == FontStyle.Bold ? "Segoe UI Variable Display Semibold" : "Segoe UI Variable Text", pt * EZ / 100f)
+        : new(st == FontStyle.Bold ? "Segoe UI Semibold" : "Segoe UI", pt * EZ / 100f);
 
     public void ApplySettings()
     {
         L.Lang = s.Lang;
         L.Hour12 = s.Hour12;
         Theme.UiScale = Math.Clamp(s.UiScale, 80, 160) / 100f;
-        Theme.SetMode(s.ThemeMode); // windows opened from now on
+        Theme.SetMode(s.ThemeMode); // windows opened from now on, and the widget itself
+        BackColor = Theme.Bg;
         showItem.Text = L.T("ShowWidget");
         monthItem.Text = L.T("Month");
         holidaysItem.Text = L.T("Holidays");
@@ -223,7 +216,7 @@ public class Widget : Form
     protected override void OnSizeChanged(EventArgs e)
     {
         base.OnSizeChanged(e);
-        Region = full ? null : Region.FromHrgn(CreateRoundRectRgn(0, 0, Width + 1, Height + 1, Zi(14), Zi(14)));
+        Region = full ? null : Region.FromHrgn(CreateRoundRectRgn(0, 0, Width + 1, Height + 1, Zi(16), Zi(16))); // 8 px corners, Fluent
     }
 
     protected override void SetVisibleCore(bool value) => base.SetVisibleCore(value && s.WidgetVisible);
@@ -427,12 +420,17 @@ public class Widget : Form
 
     static string Fmt(TimeSpan t) => $"{(int)t.TotalHours:00}:{t.Minutes:00}:{t.Seconds:00}";
 
-    // Palette of the KZ mobile prayer apps: night-sky background, grey card, green "next" bar.
-    static readonly Color Sky1 = Color.FromArgb(10, 16, 38), Sky2 = Color.FromArgb(27, 36, 66);
-    static readonly Color CardFill = Color.FromArgb(242, 44, 46, 54), CardBorder = Color.FromArgb(70, 255, 255, 255);
-    static readonly Color Pill = Color.FromArgb(78, 80, 90), Green = Color.FromArgb(22, 163, 116);
-    static readonly Color Grey = Color.FromArgb(142, 142, 147), Speaker = Color.FromArgb(128, 131, 138);
-    static readonly Color Gold = Color.FromArgb(230, 190, 110), GoldBar = Color.FromArgb(176, 128, 44); // Ramadan
+    // Fluent 2 palette from the theme (dark or light): Mica-like base, card layer, accent "next" bar.
+    static Color Sky1 => Theme.Bg;
+    static Color CardFill => Theme.Card;
+    static Color CardBorder => Theme.Line;
+    static Color Pill => Theme.Line;
+    static Color Green => Theme.Accent;
+    static Color Grey => Theme.Muted;
+    static Color Speaker => Theme.Muted;
+    static Color Fg => Theme.Text;
+    static Color Gold => Theme.Gold;
+    static Color GoldBar => Theme.IsDark ? Color.FromArgb(176, 128, 44) : Color.FromArgb(196, 140, 30); // Ramadan
 
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -448,27 +446,19 @@ public class Widget : Form
         const TextFormatFlags Right = TextFormatFlags.Right | TextFormatFlags.VerticalCenter;
         const TextFormatFlags Left = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis;
 
-        // Background: gradient night sky with a few fixed stars.
-        using (var sky = new LinearGradientBrush(ClientRectangle, Sky1, Sky2, 90f)) g.FillRectangle(sky, ClientRectangle);
-        var rnd = new Random(7);
-        var starCount = ClientSize.Width * ClientSize.Height / Math.Max(1, Zi(38) * Zi(38));
-        for (int i = 0; i < starCount; i++)
-        {
-            var d = Z(0.8f + (float)rnd.NextDouble() * 1.6f);
-            using var star = new SolidBrush(Color.FromArgb(rnd.Next(50, 170), Color.White));
-            g.FillEllipse(star, (float)rnd.NextDouble() * ClientSize.Width, (float)rnd.NextDouble() * ClientSize.Height, d, d);
-        }
+        // Background: plain Mica-like base, as in Windows 11.
+        using (var bgb = new SolidBrush(Sky1)) g.FillRectangle(bgb, ClientRectangle);
 
         // Content is BaseWidth wide; in fullscreen it is scaled up and centred on the screen.
         int cw = Zi(BaseWidth), ox = (ClientSize.Width - cw) / 2, oy = full ? (ClientSize.Height - Zi(ContentHeight)) / 2 : 0;
         float left = ox + Z(14), right = ox + cw - Z(14);
 
         // Header: clock on the left; location, dates and holiday right-aligned.
-        TextRenderer.DrawText(g, L.Time(now), clock, new Point((int)left - Zi(2), oy + Zi(TopStrip + 9)), Color.White);
+        TextRenderer.DrawText(g, L.Time(now), clock, new Point((int)left - Zi(2), oy + Zi(TopStrip + 9)), Fg);
         float y = oy + Z(TopStrip + 6);
         var city = s.City.Title + (s.Muted ? " 🔕" : "");
         var cityW = TextRenderer.MeasureText(g, city, head, Size.Empty, TextFormatFlags.NoPadding).Width;
-        var cityColor = hotCity ? Theme.NightAccent : Color.White; // green on hover: it is clickable
+        var cityColor = hotCity ? Theme.Accent : Fg; // green on hover: it is clickable
         TextRenderer.DrawText(g, city, head, Rectangle.Round(new RectangleF(left, y, right - left, Z(19))), cityColor, Right | TextFormatFlags.EndEllipsis);
         // Location arrow (like iOS "location.fill"); Segoe MDL2 has no such glyph.
         float ax = right - cityW - Z(19), ay = y + Z(4.5f), a = Z(10);
@@ -479,7 +469,7 @@ public class Widget : Form
         var date = now.ToString(L.Lang == "ru" ? "d MMMM yyyy" : "d MMMM, yyyy", L.Culture);
         if (L.Lang != "ru") { var sp = date.IndexOf(' ') + 1; date = date[..sp] + char.ToUpper(date[sp], L.Culture) + date[(sp + 1)..]; }
         var lines = new List<(string Text, Color Color)> { (date, Grey), (Hijri.Format(DateOnly.FromDateTime(now), s.HijriAdjust), Grey) };
-        if (holiday != null) lines.Add(("✦ " + L.T(holiday.Key), Theme.NightAccent));
+        if (holiday != null) lines.Add(("✦ " + L.T(holiday.Key), Theme.Accent));
         foreach (var (text, color) in lines)
         {
             TextRenderer.DrawText(g, text, head, Rectangle.Round(new RectangleF(left, y, right - left, Z(19))), color, Right | TextFormatFlags.EndEllipsis);
@@ -492,7 +482,7 @@ public class Widget : Form
         if (update != null)
         {
             updateBanner = new RectangleF(ox + Z(12), y, cw - Z(24), Z(28));
-            using var bp = Theme.RoundRect(updateBanner, Z(8));
+            using var bp = Theme.RoundRect(updateBanner, Z(4));
             using (var bb = new SolidBrush(Color.FromArgb(downloading == null ? 70 : 40, Green))) g.FillPath(bb, bp);
             using (var bpen = new Pen(Green, Math.Max(1, Z(1)))) g.DrawPath(bpen, bp);
             if (downloading is { } pct) // progress fill
@@ -504,40 +494,42 @@ public class Widget : Form
             }
             var text = downloading is { } d ? string.Format(L.T("Downloading"), d)
                 : string.Format(L.T("UpdateBanner"), "v" + update.Version.ToString(3));
-            TextRenderer.DrawText(g, text, small, Rectangle.Round(updateBanner), Color.White,
+            TextRenderer.DrawText(g, text, small, Rectangle.Round(updateBanner), Fg,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             y += Z(36);
         }
 
         // Card with prayer rows.
         var card = new RectangleF(ox + Z(12), y, cw - Z(24), Z(CardHeight));
-        using var cardPath = Theme.RoundRect(card, Z(14));
+        using var cardPath = Theme.RoundRect(card, Z(8));
         using (var fill = new SolidBrush(CardFill)) g.FillPath(fill, cardPath);
         float rx = card.X + Z(14), rr = card.Right - Z(14), ry = card.Y + Z(6);
         bells.Clear();
         if (today == null)
-            TextRenderer.DrawText(g, L.T("NoData"), small, Rectangle.Round(new RectangleF(rx, ry, rr - rx, Z(60))), Color.White, Left);
+            TextRenderer.DrawText(g, L.T("NoData"), small, Rectangle.Round(new RectangleF(rx, ry, rr - rx, Z(60))), Fg, Left);
         foreach (var r in rows)
         {
             var h = Z(r.H);
+            // Current prayer: Fluent selection (soft fill + accent pill), drawn under the row's text
+            if (r.P == current)
+            {
+                using var row = Theme.RoundRect(new RectangleF(card.X + Z(4), ry + Z(2), card.Width - Z(8), h - Z(4)), Z(4));
+                using (var pb = new SolidBrush(Pill)) g.FillPath(pb, row);
+                using var mark = Theme.RoundRect(new RectangleF(card.X + Z(4), ry + h / 2 - Z(8), Z(3), Z(16)), Z(1));
+                using (var ab = new SolidBrush(Green)) g.FillPath(ab, mark);
+            }
             if (r.Sub is { } sub)
             {
-                TextRenderer.DrawText(g, L.Name(r.P), name, Rectangle.Round(new RectangleF(rx, ry + Z(4), rr - rx, Z(24))), Color.White, Left);
+                TextRenderer.DrawText(g, L.Name(r.P), name, Rectangle.Round(new RectangleF(rx, ry + Z(4), rr - rx, Z(24))), Fg, Left);
                 TextRenderer.DrawText(g, sub, small, Rectangle.Round(new RectangleF(rx, ry + Z(26), rr - rx, Z(18))),
                     r.P == P.Sunrise ? Grey : Gold, Left);
             }
-            else TextRenderer.DrawText(g, L.Name(r.P), name, Rectangle.Round(new RectangleF(rx, ry, rr - rx, h)), Color.White, Left);
+            else TextRenderer.DrawText(g, L.Name(r.P), name, Rectangle.Round(new RectangleF(rx, ry, rr - rx, h)), Fg, Left);
 
             // Times sit centred in a fixed-width box at the right; the current one gets a pill of exactly that box.
             var boxW = TextRenderer.MeasureText(g, L.Hour12 ? "00:00 PM" : "00:00", time, Size.Empty, TextFormatFlags.NoPadding).Width + Z(14);
             var box = new RectangleF(rr - boxW + Z(6), ry + (h - Z(28)) / 2, boxW, Z(28));
-            if (r.P == current)
-            {
-                using var pill = Theme.RoundRect(box, Z(7));
-                using var pb = new SolidBrush(Pill);
-                g.FillPath(pb, pill);
-            }
-            TextRenderer.DrawText(g, L.Time(r.At), time, Rectangle.Round(box), Color.White,
+            TextRenderer.DrawText(g, L.Time(r.At), time, Rectangle.Round(box), Fg,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
 
             // Speaker: click toggles this prayer's notification.
@@ -546,24 +538,24 @@ public class Widget : Form
             var icon = new RectangleF(Math.Min(card.X + card.Width / 2 + Z(4), box.X - Z(36)), ry, Z(24), h);
             // Volume3 vs Mute: both start at the same x and are nearly the same width, so the column lines up.
             TextRenderer.DrawText(g, on ? "" : "", icons, Rectangle.Round(icon),
-                on && !s.Muted ? Color.FromArgb(205, 208, 214) : Speaker, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                on && !s.Muted ? Fg : Speaker, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             bells.Add((icon, r.P));
             ry += h;
         }
 
         // Bottom bars, clipped to the card's rounded bottom: Ramadan countdown (gold), then next prayer (green).
-        void Bar(float top, Color fillColor, string label, TimeSpan left)
+        void Bar(float top, Color fillColor, Color textColor, string label, TimeSpan left)
         {
             var bar = new RectangleF(card.X, top, card.Width, Z(38));
             g.SetClip(cardPath);
             using (var gb = new SolidBrush(fillColor)) g.FillRectangle(gb, bar);
             g.ResetClip();
             var timeW = TextRenderer.MeasureText(g, "00:00:00", time, Size.Empty, TextFormatFlags.NoPadding).Width + Z(8);
-            TextRenderer.DrawText(g, label, name, Rectangle.Round(new RectangleF(rx, bar.Y, rr - rx - timeW, bar.Height)), Color.White, Left);
-            TextRenderer.DrawText(g, Fmt(left), time, Rectangle.Round(new RectangleF(rx, bar.Y, rr - rx, bar.Height)), Color.White, Right);
+            TextRenderer.DrawText(g, label, name, Rectangle.Round(new RectangleF(rx, bar.Y, rr - rx - timeW, bar.Height)), textColor, Left);
+            TextRenderer.DrawText(g, Fmt(left), time, Rectangle.Round(new RectangleF(rx, bar.Y, rr - rx, bar.Height)), textColor, Right);
         }
-        if (fast is { } f) Bar(card.Bottom - Z(76), GoldBar, f.Label, f.At - now);
-        if (next is { } n) Bar(card.Bottom - Z(38), Green, L.Name(n.P), n.At - now);
+        if (fast is { } f) Bar(card.Bottom - Z(76), GoldBar, Color.White, f.Label, f.At - now);
+        if (next is { } n) Bar(card.Bottom - Z(38), Green, Theme.OnAccent, L.Name(n.P), n.At - now);
         using (var border = new Pen(CardBorder, Math.Max(1, Z(1)))) g.DrawPath(border, cardPath);
 
         // Name of the day: one of the 99 names, changes daily; click opens the full list.
@@ -572,15 +564,15 @@ public class Widget : Form
         {
             var nm = Name99.OfDay(DateOnly.FromDateTime(now));
             nameCard = new RectangleF(card.X, card.Bottom + Z(10), card.Width, Z(NameCardHeight));
-            using var np = Theme.RoundRect(nameCard, Z(14));
+            using var np = Theme.RoundRect(nameCard, Z(8));
             using (var nf = new SolidBrush(CardFill)) g.FillPath(nf, np);
-            using (var nb = new Pen(Color.FromArgb(110, Gold), Math.Max(1, Z(1)))) g.DrawPath(nb, np);
+            using (var nb = new Pen(CardBorder, Math.Max(1, Z(1)))) g.DrawPath(nb, np);
             using var arFont = new Font(Name99.ArabicFont, 17f * EZ / 100f);
             TextRenderer.DrawText(g, $"{L.T("NameOfDay")} · {nm.N} / 99", small,
                 Rectangle.Round(new RectangleF(rx, nameCard.Y + Z(6), rr - rx, Z(18))), Gold, Left);
-            TextRenderer.DrawText(g, nm.Ar, arFont, Rectangle.Round(new RectangleF(rx, nameCard.Y + Z(22), rr - rx, Z(36))), Color.White,
+            TextRenderer.DrawText(g, nm.Ar, arFont, Rectangle.Round(new RectangleF(rx, nameCard.Y + Z(22), rr - rx, Z(36))), Fg,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.RightToLeft);
-            TextRenderer.DrawText(g, nm.Translit, name, Rectangle.Round(new RectangleF(rx, nameCard.Y + Z(56), rr - rx, Z(22))), Color.White,
+            TextRenderer.DrawText(g, nm.Translit, name, Rectangle.Round(new RectangleF(rx, nameCard.Y + Z(56), rr - rx, Z(22))), Fg,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             TextRenderer.DrawText(g, nm.Meaning, small, Rectangle.Round(new RectangleF(rx, nameCard.Y + Z(76), rr - rx, Z(18))), Grey,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
@@ -595,11 +587,11 @@ public class Widget : Form
                 tools[i] = new RectangleF(ox + Z(6) + i * Z(26), oy + Z(2), Z(25), Z(24));
                 if (i == hotTool)
                 {
-                    using var chip = Theme.RoundRect(tools[i], Z(6));
-                    using var cb = new SolidBrush(Color.FromArgb(60, 255, 255, 255));
+                    using var chip = Theme.RoundRect(tools[i], Z(4));
+                    using var cb = new SolidBrush(Pill);
                     g.FillPath(cb, chip);
                 }
-                TextRenderer.DrawText(g, toolGlyphs[i], toolFont, Rectangle.Round(tools[i]), i == hotTool ? Color.White : Grey,
+                TextRenderer.DrawText(g, toolGlyphs[i], toolFont, Rectangle.Round(tools[i]), i == hotTool ? Fg : Grey,
                     TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             }
         }
@@ -615,8 +607,8 @@ public class Widget : Form
         for (int i = 0; i < 3; i++)
         {
             if (i == hot)
-                using (var hb = new SolidBrush(i == 2 ? Color.FromArgb(196, 43, 28) : Theme.NightLine)) g.FillRectangle(hb, captions[i]);
-            TextRenderer.DrawText(g, glyphs[i], capFont, Rectangle.Round(captions[i]), i == hot ? Color.White : Grey,
+                using (var hb = new SolidBrush(i == 2 ? Color.FromArgb(196, 43, 28) : Pill)) g.FillRectangle(hb, captions[i]);
+            TextRenderer.DrawText(g, glyphs[i], capFont, Rectangle.Round(captions[i]), i == hot ? (i == 2 ? Color.White : Fg) : Grey,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         }
     }
@@ -741,34 +733,23 @@ public class Widget : Form
         base.OnFormClosing(e);
     }
 
-    // Windows opened from the widget must not end up behind it when the widget is "always on top".
-    void Open<T>(ref T? form, Func<T> make) where T : Form
+    // The main window must not end up behind the widget when the widget is "always on top".
+    void Page(string key, Func<Form>? make = null)
     {
-        if (form is { IsDisposed: false }) { form.Activate(); return; }
-        form = make();
-        form.TopMost = TopMost;
-        form.Show();
+        if (main is not { IsDisposed: false }) main = new MainWindow(s, OpenSettings);
+        main.TopMost = TopMost;
+        main.ShowPage(key, make);
     }
 
-    void OpenTasbih() => Open(ref tasbihForm, () => new TasbihForm(s));
-    void OpenNames() => Open(ref namesForm, () => new NamesForm());
-    void OpenTypes() => Open(ref typesForm, () => new PrayerTypesForm());
-    void OpenQada() => Open(ref qadaForm, () => new QadaForm(s));
-    void OpenZakat() => Open(ref zakatForm, () => new ZakatForm(s));
-    void OpenNews() => Open(ref newsForm, () => new NewsForm());
-
-    void OpenQuran(int? sura = null)
-    {
-        if (sura != null) quranForm?.Close(); // a reminder opens the reader on its sura
-        Open(ref quranForm, () => new QuranForm(s, sura));
-    }
-
-    void OpenAdhkar(bool? morning = null)
-    {
-        adhkarForm?.Close(); // reopen on the requested tab (morning / evening)
-        adhkarForm = new AdhkarForm(s, morning) { TopMost = TopMost };
-        adhkarForm.Show();
-    }
+    void OpenTasbih() => Page("tasbih");
+    void OpenNames() => Page("names");
+    void OpenTypes() => Page("types");
+    void OpenQada() => Page("qada");
+    void OpenZakat() => Page("zakat");
+    void OpenNews() => Page("news");
+    // A reminder opens the reader on its surah / the adhkar on morning or evening.
+    void OpenQuran(int? sura = null) => Page("quran", sura == null ? null : () => new QuranForm(s, sura));
+    void OpenAdhkar(bool? morning = null) => Page("adhkar", morning == null ? null : () => new AdhkarForm(s, morning));
 
     void OpenSettings()
     {
@@ -780,6 +761,7 @@ public class Widget : Form
             Data.Save(s);
             shownDate = default; // re-evaluate holiday with new hijri adjustment
             ApplySettings();
+            if (main is { IsDisposed: false, Visible: true, Current: var page }) { main.Close(); main = null; Page(page); } // rebuild in the new theme and language
         };
         settingsForm.Show();
     }

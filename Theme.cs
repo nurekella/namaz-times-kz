@@ -48,7 +48,7 @@ public static class Theme
     public static int Dp(int v) => (int)Math.Round(v * Dpi / 96f * UiScale);
 
     // Windows 11 ships Segoe UI Variable, which reads better; Windows 10 falls back to Segoe UI.
-    static readonly bool Variable = FontFamily.Families.Any(f => f.Name == "Segoe UI Variable Text");
+    public static readonly bool Variable = FontFamily.Families.Any(f => f.Name == "Segoe UI Variable Text");
     public static Font UI(float size = 10f, FontStyle style = FontStyle.Regular) => Variable
         ? new(style.HasFlag(FontStyle.Bold) ? "Segoe UI Variable Text Semibold" : "Segoe UI Variable Text", size * UiScale, style & ~FontStyle.Bold)
         : new("Segoe UI", size * UiScale, style);
