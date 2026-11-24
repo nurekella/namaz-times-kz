@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 # PreToolUse (Read|Edit|Write): blocks access to secret files. exit 2 = deny, stderr goes to Claude.
-path=$(jq -r '.tool_input.file_path // .tool_input.path // empty')
+input=$(cat)
+if command -v jq >/dev/null 2>&1; then
+  path=$(jq -r '.tool_input.file_path // .tool_input.path // empty' <<<"$input")
+else
+  # no jq (e.g. Git Bash on Windows): crude fallback; never fail open
+  path=$(sed -nE 's/.*"(file_path|path)" *: *"([^"]*)".*/\2/p' <<<"$input" | head -1)
+  if [ -z "$path" ] && grep -q '"tool_input"' <<<"$input"; then
+    echo "Blocked: jq is not installed, so the path cannot be checked. Install jq." >&2
+    exit 2
+  fi
+fi
 [ -z "$path" ] && exit 0
 name=$(basename "$path")
 case "$name" in
