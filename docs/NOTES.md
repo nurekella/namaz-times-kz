@@ -16,4 +16,5 @@ Format: `YYYY-MM-DD — symptom → cause → fix → commit`
   `export PATH="$PATH:$(cygpath "$LOCALAPPDATA")/Microsoft/WinGet/Packages/jqlang.jq_Microsoft.Winget.Source_8wekyb3d8bbwe"`.
 - `python3` is the Microsoft Store stub; use `py`.
 - IMPORTANT: `.claude/hooks/protect-secrets.sh` needs `jq`. Without jq on PATH it exits 0 and blocks NOTHING (fails open).
-  With jq on PATH it blocks `.env` (exit 2) — verified 2026-11-24. Fix: put jq on the user PATH (see above).
+  With jq on PATH it blocks `.env` (exit 2) — verified 2026-11-24. jq is on the user PATH (winget); a running Claude
+  app keeps its old PATH — fully restart it after PATH changes. Fail-closed hook fix: standard branch `fix/windows-findings`.
