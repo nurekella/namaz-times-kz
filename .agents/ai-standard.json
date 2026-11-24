@@ -1,0 +1,23 @@
+{
+  "version": "1.5.1",
+  "updated": "2026-11-24",
+  "files": {
+    ".agents/rules/security.md": "d1eb5b727cb659ed282aad09a45df134dd839198835dd09c53e29a7484e591a3",
+    ".agents/skills/audit-harness/SKILL.md": "126a492ddc79696bd5cead6768b6e5ef051a27528331005227c6a27351491c82",
+    ".agents/skills/checkpoint/SKILL.md": "5309f353bde3a19a9cfd2aa287249576c352a3b91c233ffc46886896d720ff09",
+    ".agents/skills/finish-task/SKILL.md": "2cf5821f9d5d0870662b6c13da14697afa0f7b3be9d64d1f6d208f0e8cf48982",
+    ".agents/skills/handoff/SKILL.md": "1c934d0126e71899548529f0fe36d83bc4825ad8327038673ebba7801e9eebaf",
+    ".agents/skills/implement/SKILL.md": "2121faa182deb066482482be95d77e8c4674635e939b21edce2d3d47d662c492",
+    ".agents/skills/review/SKILL.md": "3dbd6cff14592984fbf3a60deb651bef34f314f50b244c501f8f467926e21361",
+    ".agents/skills/spec-interview/SKILL.md": "687c873e34b24198def9fb50597e25aa6bdc440de8e1ecbcb112378bb098b08e",
+    ".agents/skills/start-task/SKILL.md": "a59b3def955742e0f6773e602f4151670ae11e5c92d285dbc5a612f154d52d27",
+    ".agents/skills/worktree/SKILL.md": "38ab01ee0f24d311b57036d997c0b420591430db4419d6b4606a76b46326108d",
+    ".claude/agents/log-analyzer.md": "a00b7d47e2f19305f422b6027358e6957404937daf4928e6a24000044838e43f",
+    ".claude/agents/researcher.md": "66836412788504ecb8e7890d51324b671628a0ec7a53d80d088eff80b95a80ac",
+    ".claude/agents/reviewer.md": "515028c75392082c25272c802760baab99c2758ed856368ec3e05cc76ce118ae",
+    ".claude/hooks/pre-compact.sh": "18ea3281ee5cd0439105038d4b2cd2927f23998820488cc93417a7aec8d53a1f",
+    ".claude/hooks/protect-secrets.sh": "0eb77fc353e4561f8a290427b2d95bee560feeed9407aa6637eb973cad093f6d",
+    ".claude/hooks/session-context.sh": "7a2713c93b6ee37362a50fc86cd23a15ffa92c479e2eb7846f4e5ed174c8a830",
+    ".claude/settings.json": "7585af15f5ad58135b253d00bfd78de1006c63b80d49c09648cbdd94706a16be"
+  }
+}
