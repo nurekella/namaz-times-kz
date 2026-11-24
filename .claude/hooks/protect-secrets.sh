@@ -6,7 +6,10 @@ if command -v jq >/dev/null 2>&1; then
 else
   # no jq (e.g. Git Bash on Windows): crude fallback; never fail open
   path=$(sed -nE 's/.*"(file_path|path)" *: *"([^"]*)".*/\2/p' <<<"$input" | head -1)
-  if [ -z "$path" ] && grep -q '"tool_input"' <<<"$input"; then
+  # undo the one escape every Windows path has (\\ → /); any other escape (., \") can't be decoded
+  # without jq and could hide a name like .env — block instead of guessing
+  path=${path//\\\\//}
+  if { [ -z "$path" ] && grep -q '"tool_input"' <<<"$input"; } || [[ $path == *\\* ]]; then
     echo "Blocked: jq is not installed, so the path cannot be checked. Install jq." >&2
     exit 2
   fi

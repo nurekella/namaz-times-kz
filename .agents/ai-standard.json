@@ -1,5 +1,5 @@
 {
-  "version": "1.5.1",
+  "version": "1.5.2",
   "updated": "2026-11-24",
   "files": {
     ".agents/rules/security.md": "d1eb5b727cb659ed282aad09a45df134dd839198835dd09c53e29a7484e591a3",
@@ -16,7 +16,7 @@
     ".claude/agents/researcher.md": "66836412788504ecb8e7890d51324b671628a0ec7a53d80d088eff80b95a80ac",
     ".claude/agents/reviewer.md": "515028c75392082c25272c802760baab99c2758ed856368ec3e05cc76ce118ae",
     ".claude/hooks/pre-compact.sh": "18ea3281ee5cd0439105038d4b2cd2927f23998820488cc93417a7aec8d53a1f",
-    ".claude/hooks/protect-secrets.sh": "d4973275436b4de8f14edf7ae423ef8367471519fe85d9eb6a6c3e874ad76881",
+    ".claude/hooks/protect-secrets.sh": "bc36256ac7a7813c6a118dcb9d942659753d8df7c3b0e8ed1e43200d202d5cc8",
     ".claude/hooks/session-context.sh": "7a2713c93b6ee37362a50fc86cd23a15ffa92c479e2eb7846f4e5ed174c8a830",
     ".claude/settings.json": "7585af15f5ad58135b253d00bfd78de1006c63b80d49c09648cbdd94706a16be"
   }
